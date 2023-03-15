@@ -19,6 +19,7 @@
 #include "ioctl.h"
 #include "log.h"
 #include "mtd.h"
+#include "options.h"
 #include "util.h"
 
 #define mtd_debug(ctx, fmt, ...)                                               \
@@ -390,8 +391,9 @@ static int init_yaffs_dev(struct mtd_ctx *ctx) {
  * in the structure passed around in the 'driver_context' field of struct
  * yaffs_dev.  Then initialize Yaffs code for the MTD in question.
  */
-static int init_mtd_context(const char *device_path, struct mtd_ctx **ctxp) {
+static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx;
+	int flags;
 	int ret;
 
 	ctx = calloc(1, sizeof(*ctx));
@@ -399,9 +401,10 @@ static int init_mtd_context(const char *device_path, struct mtd_ctx **ctxp) {
 		return -ENOMEM;
 	}
 
-	ctx->mtd_path = device_path;
+	ctx->mtd_path = opts->device_path;
 
-	ctx->mtd_fd = open(device_path, O_RDWR);
+	flags = (opts->mode == PROGRAM_MODE_READ ? O_RDONLY : O_RDWR);
+	ctx->mtd_fd = open(opts->device_path, flags);
 	if (ctx->mtd_fd < 0) {
 		ret = util_get_errno();
 		log_error(ret, "unable to open MTD character device");
@@ -474,16 +477,16 @@ static int check_device_path(const char *device_path) {
 /*
  * Initialize the MTD at the given path and mount it for subsequent operations.
  */
-int mtd_mount(const char *device_path, struct mtd_ctx **ctxp) {
+int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx = NULL;
 	int ret;
 
-	ret = check_device_path(device_path);
+	ret = check_device_path(opts->device_path);
 	if (ret < 0) {
 		return ret;
 	}
 
-	ret = init_mtd_context(device_path, &ctx);
+	ret = init_mtd_context(opts, &ctx);
 	if (ret < 0 || !ctx) {
 		return ret;
 	}

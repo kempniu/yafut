@@ -264,25 +264,15 @@ static int copy_file(int (*copy_fn)(const struct mtd_ctx *mtd,
 	struct mtd_ctx *mtd;
 	int ret;
 
-	ret = mtd_mount(opts->device_path, &mtd);
+	ret = mtd_mount(opts, &mtd);
 	if (ret < 0) {
 		log_error(ret, "unable to mount MTD");
 		return ret;
 	}
 
-	/*
-	 * Perform the requested action.  Note that an error here causes an
-	 * early return.  While calling mtd_unmount() also in case of an error
-	 * would allow all resources to be released, unmounting a YAFFS
-	 * filesystem may cause the MTD device to be written to, which is
-	 * arguably prudent to avoid after failing to read a file from an
-	 * existing filesystem (to prevent further damage to a potentially
-	 * broken filesystem).
-	 */
 	ret = copy_fn(mtd, opts);
 	if (ret < 0) {
 		log_error(ret, "copying failed");
-		return ret;
 	}
 
 	return mtd_unmount(&mtd);

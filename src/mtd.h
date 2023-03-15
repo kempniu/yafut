@@ -6,9 +6,11 @@
 
 #include <unistd.h>
 
+#include "options.h"
+
 struct mtd_ctx;
 
-int mtd_mount(const char *device_path, struct mtd_ctx **ctxp);
+int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp);
 int mtd_unmount(struct mtd_ctx **ctxp);
 
 int mtd_file_open_read(const struct mtd_ctx *ctx, const char *path, int *fd);
