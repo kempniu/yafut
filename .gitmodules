@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[submodule "yaffs2"]
+	path = lib/yaffs2
+	url = https://github.com/kempniu/yaffs2.git
+	branch = pending-upstream-patches-main

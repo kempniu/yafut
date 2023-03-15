@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
+#
+# SPDX-License-Identifier: GPL-2.0-only
+
+name: Licensing checks
+on: pull_request
+
+jobs:
+  reuse:
+    runs-on: ubuntu-22.04
+    name: Licensing
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Check REUSE compliance
+        uses: fsfe/reuse-action@v1

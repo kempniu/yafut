@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
+#
+# SPDX-License-Identifier: GPL-2.0-only
+
+name: Source code checks
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        image: ['alpine:3.17', 'debian:11', 'fedora:37', 'redhat/ubi9:latest', 'ubuntu:22.04']
+        compiler: ['clang', 'gcc']
+    container: ${{ matrix.image }}
+    name: Build (${{ matrix.image }}, ${{ matrix.compiler }})
+    steps:
+      - name: Update package repository metadata
+        run: |
+          if command -v apk; then apk update; fi
+          if command -v apt-get; then apt-get -y update; fi
+          if command -v dnf; then dnf -y check-update || true; fi
+      - name: Install Git
+        run: |
+          if command -v apk; then apk add git; fi
+          if command -v apt-get; then apt-get -y install git; fi
+          if command -v dnf; then dnf -y install git; fi
+      - name: Install CMake
+        run: |
+          if command -v apk; then apk add cmake; fi
+          if command -v apt-get; then apt-get -y install cmake; fi
+          if command -v dnf; then dnf -y install cmake; fi
+      - name: Install GNU Make
+        run: |
+          if command -v apk; then apk add make; fi
+          if command -v apt-get; then apt-get -y install make; fi
+          if command -v dnf; then dnf -y install make; fi
+      - name: Install Clang
+        if: matrix.compiler == 'clang'
+        run: |
+          if command -v apk; then apk add clang compiler-rt lld; fi
+          if command -v apt-get; then apt-get -y install clang clang-tools perl; fi
+          if command -v dnf; then dnf -y install clang; fi
+      - name: Install GCC
+        if: matrix.compiler == 'gcc'
+        run: |
+          if command -v apk; then apk add gcc; fi
+          if command -v apt-get; then apt-get -y install gcc; fi
+          if command -v dnf; then dnf -y install gcc; fi
+      - name: Install necessary header files
+        run: |
+          if command -v apk; then apk add linux-headers musl-dev; fi
+      - name: List installed tool versions
+        run: |
+          git --version
+          cmake --version
+          make --version
+          if command -v clang; then clang --version; fi
+          if command -v gcc; then gcc --version; fi
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Build the project
+        env:
+          CC: ${{ matrix.compiler }}
+          CMAKE_ARGS_STANDARD: -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DENABLE_ALL_WARNINGS=ON
+          CMAKE_ARGS_EXTRA: ${{ (startsWith(matrix.image, 'alpine') && matrix.compiler == 'clang') && ' -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld -rtlib=compiler-rt"' || '' }}
+          CLANG_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'clang') && 'scan-build --exclude lib/ --status-bugs ' || '' }}
+          GCC_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'gcc') && 'CFLAGS="-fanalyzer" ' || '' }}
+        run: ${{ env.GCC_STATIC_ANALYZER }}${{ env.CLANG_STATIC_ANALYZER }}cmake ${{ env.CMAKE_ARGS_STANDARD }}${{ env.CMAKE_ARGS_EXTRA }} -B build && ${{ env.CLANG_STATIC_ANALYZER }}cmake --build build
+  clang-format:
+    runs-on: ubuntu-22.04
+    name: Code style
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Format source files (in-place) using clang-format
+        run: clang-format -i src/*
+      - name: Check if any files were modified
+        run: git diff --exit-code

@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+AllowShortFunctionsOnASingleLine: None
+BasedOnStyle: LLVM
+BreakBeforeBinaryOperators: All
+ContinuationIndentWidth: 8
+IndentWidth: 8
+UseTab: Always
