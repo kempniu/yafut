@@ -5,4 +5,4 @@
 [submodule "yaffs2"]
 	path = lib/yaffs2
 	url = https://github.com/kempniu/yaffs2.git
-	branch = pending-upstream-patches-main
+	branch = pending-upstream-patches-debug
