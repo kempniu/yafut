@@ -4,6 +4,8 @@ SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
 SPDX-License-Identifier: GPL-2.0-only
 -->
 
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/kempniu/yafut/code.yml)](https://github.com/kempniu/yafut/actions/workflows/code.yml)
+
 # Yafut (Yet Another File UTility)
 
 ## Overview
