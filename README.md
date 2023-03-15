@@ -5,6 +5,7 @@ SPDX-License-Identifier: GPL-2.0-only
 -->
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/kempniu/yafut/code.yml)](https://github.com/kempniu/yafut/actions/workflows/code.yml)
+[![License](https://img.shields.io/github/license/kempniu/yafut)](https://github.com/kempniu/yafut/blob/main/LICENSE)
 
 # Yafut (Yet Another File UTility)
 
