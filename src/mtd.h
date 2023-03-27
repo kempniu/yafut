@@ -11,7 +11,7 @@
 struct mtd_ctx;
 
 int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp);
-int mtd_unmount(struct mtd_ctx **ctxp);
+void mtd_unmount(struct mtd_ctx **ctxp);
 
 int mtd_file_open_read(const struct mtd_ctx *ctx, const char *path, int *fd);
 int mtd_file_open_write(const struct mtd_ctx *ctx, const char *path, int *fd);

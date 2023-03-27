@@ -509,7 +509,7 @@ int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp) {
 /*
  * Unmount the MTD used and release all resources associated with it.
  */
-int mtd_unmount(struct mtd_ctx **ctxp) {
+void mtd_unmount(struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx = *ctxp;
 	int ret;
 
@@ -522,8 +522,6 @@ int mtd_unmount(struct mtd_ctx **ctxp) {
 	}
 
 	destroy_mtd_context(ctxp);
-
-	return ret;
 }
 
 /*

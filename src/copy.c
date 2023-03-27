@@ -275,7 +275,9 @@ static int copy_file(int (*copy_fn)(const struct mtd_ctx *mtd,
 		log_error(ret, "copying failed");
 	}
 
-	return mtd_unmount(&mtd);
+	mtd_unmount(&mtd);
+
+	return ret;
 }
 
 /*
