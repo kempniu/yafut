@@ -418,8 +418,8 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 	int is_yaffs2;
 
 	mtd_debug(ctx,
-		  "type=%02x, flags=%08x, size=%08x, erasesize=%08x, "
-		  "writesize=%08x, oobsize=%08x, oobavail=%08x",
+		  "type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
+		  "oobsize=%d, oobavail=%d",
 		  mtd->type, mtd->flags, mtd->size, mtd->erasesize,
 		  mtd->writesize, mtd->oobsize, oobavail);
 
