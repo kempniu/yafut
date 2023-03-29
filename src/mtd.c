@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -112,6 +113,67 @@ static void mtd_debug_hexdump_location(const char *file, int line,
 
 	mtd_debug_location(file, line, func, ctx, "%s:\n%s%s", description, hex,
 			   buf_len > 32 ? "    ..." : "");
+}
+
+/*
+ * Read the raw contents of the sysfs attribute at the provided 'sysfs_path'
+ * into 'buf', which is 'buf_len' bytes large.  The given sysfs attribute is
+ * expected to contain no more than 'buf_len' bytes of data.
+ */
+static int read_sysfs_attribute(const char *sysfs_path, char *buf,
+				size_t buf_len) {
+	int ret;
+	int fd;
+
+	fd = open(sysfs_path, O_RDONLY);
+	if (fd < 0) {
+		ret = util_get_errno();
+		log_error(ret, "unable to open %s", sysfs_path);
+		return ret;
+	}
+
+	ret = read(fd, buf, buf_len);
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "error reading %s", sysfs_path);
+	}
+
+	close(fd);
+
+	return ret;
+}
+
+/*
+ * Store the value reported by /sys/class/mtd/mtd<X>/oobavail (derived from
+ * 'mtd_path') in 'oobavail'.  That value is necessary for determining whether
+ * use of inband tags should be assumed and it is not returned by the
+ * MEMGETINFO ioctl, so it has to be retrieved in a different way than the
+ * other MTD parameters.
+ */
+static int read_oobavail_from_sysfs(const char *mtd_path,
+				    unsigned int *oobavail) {
+	char oobavail_str[16] = {0};
+	char path[32];
+	char *newline;
+	int ret;
+
+	ret = snprintf(path, sizeof(path), "/sys/class/mtd/%s/oobavail",
+		       basename(mtd_path));
+	if (ret < 0 || (unsigned int)ret >= sizeof(path)) {
+		return -ENOMEM;
+	}
+
+	ret = read_sysfs_attribute(path, oobavail_str, sizeof(oobavail_str));
+	if (ret < 0) {
+		return ret;
+	}
+
+	newline = strrchr(oobavail_str, '\n');
+	if (newline) {
+		*newline = '\0';
+	}
+
+	return util_parse_number(oobavail_str, 10, oobavail);
 }
 
 /*
@@ -349,14 +411,14 @@ static const struct yaffs_driver yaffs_driver_mtd = {
 /*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
-static int init_yaffs_dev(struct mtd_ctx *ctx) {
+static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 	const struct mtd_info_user *mtd = &ctx->mtd;
 
 	mtd_debug(ctx,
 		  "type=%02x, flags=%08x, size=%08x, erasesize=%08x, "
-		  "writesize=%08x, oobsize=%08x",
+		  "writesize=%08x, oobsize=%08x, oobavail=%08x",
 		  mtd->type, mtd->flags, mtd->size, mtd->erasesize,
-		  mtd->writesize, mtd->oobsize);
+		  mtd->writesize, mtd->oobsize, oobavail);
 
 	ctx->yaffs_dev = calloc(1, sizeof(*ctx->yaffs_dev));
 	if (!ctx->yaffs_dev) {
@@ -388,6 +450,7 @@ static int init_yaffs_dev(struct mtd_ctx *ctx) {
  * yaffs_dev.  Then initialize Yaffs code for the MTD in question.
  */
 static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
+	unsigned int oobavail;
 	struct mtd_ctx *ctx;
 	int flags;
 	int ret;
@@ -414,7 +477,13 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_close_mtd_fd;
 	}
 
-	ret = init_yaffs_dev(ctx);
+	ret = read_oobavail_from_sysfs(ctx->mtd_path, &oobavail);
+	if (ret < 0) {
+		log_error(ret, "unable to get count of available OOB bytes");
+		goto err_close_mtd_fd;
+	}
+
+	ret = init_yaffs_dev(ctx, oobavail);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;
