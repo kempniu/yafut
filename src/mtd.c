@@ -139,11 +139,7 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
 	mtd_debug(ctx, "ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
 		  block_no, ret, err, util_get_error(err));
 
-	if (ret < 0) {
-		return YAFFS_FAIL;
-	}
-
-	return YAFFS_OK;
+	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
 }
 
 /*
