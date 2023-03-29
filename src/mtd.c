@@ -447,6 +447,17 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 		.driver_context = ctx,
 	};
 
+	mtd_debug(ctx,
+		  "yaffs_dev: total_bytes_per_chunk=%d, "
+		  "chunks_per_block=%d, spare_bytes_per_chunk=%d, "
+		  "end_block=%d, is_yaffs2=%d, inband_tags=%d",
+		  ctx->yaffs_dev->param.total_bytes_per_chunk,
+		  ctx->yaffs_dev->param.chunks_per_block,
+		  ctx->yaffs_dev->param.spare_bytes_per_chunk,
+		  ctx->yaffs_dev->param.end_block,
+		  ctx->yaffs_dev->param.is_yaffs2,
+		  ctx->yaffs_dev->param.inband_tags);
+
 	yaffs_add_device(ctx->yaffs_dev);
 
 	return 0;
