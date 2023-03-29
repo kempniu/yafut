@@ -620,7 +620,7 @@ ssize_t mtd_file_read(const struct mtd_ctx *ctx, int fd, unsigned char *buf,
 	int ret;
 
 	ret = yaffs_read(fd, buf, count);
-	mtd_debug(ctx, "yaffs_read, fd=%d, ret=%d", fd, ret);
+	mtd_debug(ctx, "yaffs_read, fd=%d, count=%d, ret=%d", fd, count, ret);
 
 	if (ret < 0) {
 		ret = yaffsfs_GetLastError();
@@ -639,7 +639,7 @@ ssize_t mtd_file_write(const struct mtd_ctx *ctx, int fd,
 	int ret;
 
 	ret = yaffs_write(fd, buf, count);
-	mtd_debug(ctx, "yaffs_write, fd=%d, ret=%d", fd, ret);
+	mtd_debug(ctx, "yaffs_write, fd=%d, count=%d, ret=%d", fd, count, ret);
 
 	if (ret < 0) {
 		ret = yaffsfs_GetLastError();
