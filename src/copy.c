@@ -63,21 +63,31 @@ static int local_file_open_write(const char *file_path, int *fdp) {
  */
 static int copy_from_mtd_to_file(const struct mtd_ctx *mtd, int src, int dst) {
 	unsigned char buf[2048];
+	int bytes_written;
+	int bytes_read;
 	int ret;
 
-	while ((ret = mtd_file_read(mtd, src, buf, sizeof(buf))) > 0) {
-		if (write(dst, buf, ret) < 0) {
-			ret = util_get_errno();
-			log_error(ret, "error writing local file");
-			return ret;
-		}
+	while ((bytes_read = mtd_file_read(mtd, src, buf, sizeof(buf))) > 0) {
+		bytes_written = 0;
+		do {
+			ret = write(dst, buf + bytes_written,
+				    bytes_read - bytes_written);
+			if (ret < 0) {
+				ret = util_get_errno();
+				log_error(ret, "error writing local file");
+				return ret;
+			}
+
+			bytes_written += ret;
+		} while (bytes_written < bytes_read);
 	}
 
-	if (ret < 0) {
-		log_error(ret, "error reading file from MTD");
+	if (bytes_read < 0) {
+		log_error(bytes_read, "error reading file from MTD");
+		return bytes_read;
 	}
 
-	return ret;
+	return 0;
 }
 
 /*
@@ -86,21 +96,31 @@ static int copy_from_mtd_to_file(const struct mtd_ctx *mtd, int src, int dst) {
  */
 static int copy_from_file_to_mtd(const struct mtd_ctx *mtd, int src, int dst) {
 	unsigned char buf[2048];
+	int bytes_written;
+	int bytes_read;
 	int ret;
 
-	while ((ret = read(src, buf, sizeof(buf))) > 0) {
-		if ((ret = mtd_file_write(mtd, dst, buf, ret)) < 0) {
-			log_error(ret, "error writing file to MTD");
-			return ret;
-		}
+	while ((bytes_read = read(src, buf, sizeof(buf))) > 0) {
+		bytes_written = 0;
+		do {
+			ret = mtd_file_write(mtd, dst, buf + bytes_written,
+					     bytes_read - bytes_written);
+			if (ret < 0) {
+				log_error(ret, "error writing file to MTD");
+				return ret;
+			}
+
+			bytes_written += ret;
+		} while (bytes_written < bytes_read);
 	}
 
-	if (ret < 0) {
-		ret = util_get_errno();
-		log_error(ret, "error reading local file");
+	if (bytes_read < 0) {
+		bytes_read = util_get_errno();
+		log_error(bytes_read, "error reading local file");
+		return bytes_read;
 	}
 
-	return ret;
+	return 0;
 }
 
 /*
