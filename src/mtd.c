@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <mtd/mtd-user.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -412,7 +413,8 @@ static const struct yaffs_driver yaffs_driver_mtd = {
 /*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
-static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
+static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
+			  bool force_inband_tags) {
 	const struct mtd_info_user *mtd = &ctx->mtd;
 	int inband_tags;
 	int is_yaffs2;
@@ -429,8 +431,9 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 	}
 
 	is_yaffs2 = (mtd->writesize >= 2048);
-	inband_tags
-		= (is_yaffs2 && oobavail < sizeof(struct yaffs_packed_tags2));
+	inband_tags = (is_yaffs2
+		       && (oobavail < sizeof(struct yaffs_packed_tags2)
+			   || force_inband_tags));
 
 	*ctx->yaffs_dev = (struct yaffs_dev) {
 		.param = {
@@ -491,7 +494,7 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_close_mtd_fd;
 	}
 
-	ret = init_yaffs_dev(ctx, oobavail);
+	ret = init_yaffs_dev(ctx, oobavail, opts->force_inband_tags);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;

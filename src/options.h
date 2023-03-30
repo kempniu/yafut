@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #define USAGE_MSG                                                              \
 	"Usage: %s "                                                           \
 	"-d /dev/mtdX "                                                        \
@@ -11,6 +13,7 @@
 	"-i <src> "                                                            \
 	"-o <dst> "                                                            \
 	"[ -m <mode> ] "                                                       \
+	"[ -T ] "                                                              \
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
@@ -21,6 +24,7 @@
 	"    -o  path to the destination file (use '-' to write to stdout)\n"  \
 	"    -m  set destination file access permissions to <mode> (octal)\n"  \
 	"        (default: copy access permissions from <src>)\n"              \
+	"    -T  force inband tags\n"                                          \
 	"    -v  verbose output (can be used up to two times)\n"               \
 	"    -h  show usage information and exit\n"
 
@@ -38,6 +42,7 @@ struct opts {
 	const char *src_path;
 	const char *dst_path;
 	int dst_mode;
+	bool force_inband_tags;
 };
 
 void options_parse_env(void);

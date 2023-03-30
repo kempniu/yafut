@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <limits.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -43,7 +44,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.dst_mode = FILE_MODE_UNSPECIFIED,
 	};
 
-	while ((opt = getopt(argc, argv, "d:hi:m:o:rvw")) != -1) {
+	while ((opt = getopt(argc, argv, "d:hi:m:o:rTvw")) != -1) {
 		switch (opt) {
 		case 'd':
 			if (opts->device_path) {
@@ -88,6 +89,13 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				return -1;
 			}
 			opts->mode = PROGRAM_MODE_READ;
+			break;
+		case 'T':
+			if (opts->force_inband_tags) {
+				log("-T can only be used once");
+				return -1;
+			}
+			opts->force_inband_tags = true;
 			break;
 		case 'v':
 			if (log_level >= 2) {
