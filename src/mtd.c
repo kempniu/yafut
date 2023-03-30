@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include <yaffs_guts.h>
+#include <yaffs_packedtags2.h>
 #include <yportenv.h>
 
 #include "ioctl.h"
@@ -413,6 +414,8 @@ static const struct yaffs_driver yaffs_driver_mtd = {
  */
 static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 	const struct mtd_info_user *mtd = &ctx->mtd;
+	int inband_tags;
+	int is_yaffs2;
 
 	mtd_debug(ctx,
 		  "type=%02x, flags=%08x, size=%08x, erasesize=%08x, "
@@ -425,6 +428,10 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 		return -ENOMEM;
 	}
 
+	is_yaffs2 = (mtd->writesize >= 2048);
+	inband_tags
+		= (is_yaffs2 && oobavail < sizeof(struct yaffs_packed_tags2));
+
 	*ctx->yaffs_dev = (struct yaffs_dev) {
 		.param = {
 			.total_bytes_per_chunk = mtd->writesize,
@@ -433,7 +440,8 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail) {
 			.start_block = 0,
 			.end_block = (mtd->size / mtd->erasesize) - 1,
 			.n_reserved_blocks = 2,
-			.is_yaffs2 = (mtd->writesize >= 2048 ? 1 : 0),
+			.is_yaffs2 = is_yaffs2,
+			.inband_tags = inband_tags,
 		},
 		.drv = yaffs_driver_mtd,
 		.driver_context = ctx,
