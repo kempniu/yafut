@@ -27,3 +27,4 @@ int util_get_errno_location(const char *file, int line, const char *func);
 #endif /* __clang_analyzer__ */
 
 char *util_get_error(int err);
+int util_parse_number(const char *string, int base, unsigned int *result);

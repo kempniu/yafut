@@ -3,43 +3,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <limits.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "log.h"
 #include "options.h"
-
-/*
- * Convert the provided 'string' to an unsigned integer value according to the
- * given 'base', storing the result in 'result'.  The number represented by
- * 'string' is expected to be non-negative and not greater than UINT_MAX, in
- * which case this function returns 0; otherwise, it returns -1, which
- * indicates an error.
- */
-static int parse_number(const char *string, int base, unsigned int *result) {
-	char *first_bad_char = NULL;
-	long long ret;
-
-	if (!string) {
-		return -1;
-	}
-
-	ret = strtoll(string, &first_bad_char, base);
-	if (first_bad_char && *first_bad_char != '\0') {
-		log("unable to parse '%s' as a number (base %d)", string, base);
-		return -1;
-	}
-
-	if (ret < 0 || ret > UINT_MAX) {
-		log("number '%s' (base %d) is out of range (0 <= number <= %u)",
-		    string, base, UINT_MAX);
-		return -1;
-	}
-
-	*result = ret;
-
-	return 0;
-}
+#include "util.h"
 
 /*
  * Parse the YAFFS_TRACE_MASK environment variable and use its value to set up
@@ -53,7 +23,7 @@ void options_parse_env(void) {
 		return;
 	}
 
-	if (parse_number(env_yaffs_trace_mask, 16, &mask) < 0) {
+	if (util_parse_number(env_yaffs_trace_mask, 16, &mask) < 0) {
 		log("Invalid Yaffs trace mask '%s'", env_yaffs_trace_mask);
 		return;
 	}
@@ -74,7 +44,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.dst_mode = FILE_MODE_UNSPECIFIED,
 	};
 
-	while ((opt = getopt(argc, argv, "d:hi:m:o:rvw")) != -1) {
+	while ((opt = getopt(argc, argv, "d:hi:m:o:rTvw")) != -1) {
 		switch (opt) {
 		case 'd':
 			if (opts->device_path) {
@@ -98,7 +68,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 			{
 				unsigned int mode;
 
-				if (parse_number(optarg, 8, &mode) < 0
+				if (util_parse_number(optarg, 8, &mode) < 0
 				    || mode > INT_MAX) {
 					return -1;
 				}
@@ -119,6 +89,13 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				return -1;
 			}
 			opts->mode = PROGRAM_MODE_READ;
+			break;
+		case 'T':
+			if (opts->force_inband_tags) {
+				log("-T can only be used once");
+				return -1;
+			}
+			opts->force_inband_tags = true;
 			break;
 		case 'v':
 			if (log_level >= 2) {
