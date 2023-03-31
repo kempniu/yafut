@@ -75,7 +75,7 @@ jobs:
           CMAKE_ARGS_STANDARD: -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DENABLE_ALL_WARNINGS=ON
           CMAKE_ARGS_EXTRA: ${{ (startsWith(matrix.image, 'alpine') && matrix.compiler == 'clang') && ' -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld -rtlib=compiler-rt"' || '' }}
           CLANG_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'clang') && 'scan-build --exclude lib/ --status-bugs ' || '' }}
-          GCC_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'gcc') && 'CFLAGS="-fanalyzer" ' || '' }}
+          GCC_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'gcc') && 'CFLAGS="-fanalyzer -D__gcc_analyzer__" ' || '' }}
         run: ${{ env.GCC_STATIC_ANALYZER }}${{ env.CLANG_STATIC_ANALYZER }}cmake ${{ env.CMAKE_ARGS_STANDARD }}${{ env.CMAKE_ARGS_EXTRA }} -B build && ${{ env.CLANG_STATIC_ANALYZER }}cmake --build build
   clang-format:
     runs-on: ubuntu-22.04
