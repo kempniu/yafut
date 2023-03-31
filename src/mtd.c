@@ -179,6 +179,44 @@ static int read_oobavail_from_sysfs(const char *mtd_path,
 }
 
 /*
+ * Given an MTD context 'ctx' with its 'mtd_fd' member containing an open file
+ * descriptor for an MTD character device, use the MEMGETINFO ioctl and sysfs
+ * attribute values to determine the parameters of the provided MTD and store
+ * most of them in 'ctx->mtd'; store the number of available bytes in the OOB
+ * area in 'oobavail_out' (this value does not need to be retained in
+ * 'ctx->mtd' because it is only used during Yaffs device initialization).
+ */
+static int discover_mtd_parameters(struct mtd_ctx *ctx,
+				   unsigned int *oobavail_out) {
+	unsigned int oobavail;
+	int ret;
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMGETINFO, &ctx->mtd);
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "unable to get MTD information");
+		return ret;
+	}
+
+	ret = read_oobavail_from_sysfs(ctx->mtd_path, &oobavail);
+	if (ret < 0) {
+		log_error(ret, "unable to get count of available OOB bytes");
+		return ret;
+	}
+
+	*oobavail_out = oobavail;
+
+	mtd_debug(ctx,
+		  "type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
+		  "oobsize=%d, oobavail=%d",
+		  ctx->mtd.type, ctx->mtd.flags, ctx->mtd.size,
+		  ctx->mtd.erasesize, ctx->mtd.writesize, ctx->mtd.oobsize,
+		  oobavail);
+
+	return 0;
+}
+
+/*
  * Check whether the given MTD block is a bad one.
  *
  * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
@@ -419,12 +457,6 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
 	int inband_tags;
 	int is_yaffs2;
 
-	mtd_debug(ctx,
-		  "type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
-		  "oobsize=%d, oobavail=%d",
-		  mtd->type, mtd->flags, mtd->size, mtd->erasesize,
-		  mtd->writesize, mtd->oobsize, oobavail);
-
 	ctx->yaffs_dev = calloc(1, sizeof(*ctx->yaffs_dev));
 	if (!ctx->yaffs_dev) {
 		return -ENOMEM;
@@ -451,9 +483,9 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
 	};
 
 	mtd_debug(ctx,
-		  "yaffs_dev: total_bytes_per_chunk=%d, "
-		  "chunks_per_block=%d, spare_bytes_per_chunk=%d, "
-		  "end_block=%d, is_yaffs2=%d, inband_tags=%d",
+		  "total_bytes_per_chunk=%d, chunks_per_block=%d, "
+		  "spare_bytes_per_chunk=%d, end_block=%d, is_yaffs2=%d, "
+		  "inband_tags=%d",
 		  ctx->yaffs_dev->param.total_bytes_per_chunk,
 		  ctx->yaffs_dev->param.chunks_per_block,
 		  ctx->yaffs_dev->param.spare_bytes_per_chunk,
@@ -492,16 +524,8 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_free_ctx;
 	}
 
-	ret = linux_ioctl(ctx->mtd_fd, MEMGETINFO, &ctx->mtd);
+	ret = discover_mtd_parameters(ctx, &oobavail);
 	if (ret < 0) {
-		ret = util_get_errno();
-		log_error(ret, "unable to get MTD information");
-		goto err_close_mtd_fd;
-	}
-
-	ret = read_oobavail_from_sysfs(ctx->mtd_path, &oobavail);
-	if (ret < 0) {
-		log_error(ret, "unable to get count of available OOB bytes");
 		goto err_close_mtd_fd;
 	}
 
