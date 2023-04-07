@@ -1,0 +1,342 @@
+// SPDX-FileCopyrightText: Michał Kępień <yafut@kempniu.pl>
+//
+// SPDX-License-Identifier: GPL-2.0-only
+
+#include <errno.h>
+#include <mtd/mtd-user.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/ioctl.h>
+
+#include <yaffs_guts.h>
+#include <yportenv.h>
+
+#include "ioctl.h"
+#include "log.h"
+#include "util.h"
+#include "ydrv.h"
+
+/*
+ * Structure passed around in the 'driver_context' field of struct yaffs_dev.
+ */
+struct mtd_ctx {
+	struct mtd_info_user mtd;
+	struct yaffs_dev *yaffs_dev;
+	const char *mtd_path;
+	int mtd_fd;
+};
+
+#define mtd_debug(ctx, fmt, ...)                                               \
+	mtd_debug_location(__FILE__, __LINE__, __func__, ctx, fmt,             \
+			   ##__VA_ARGS__)
+
+/*
+ * Print the message provided in 'fmt' (and any optional arguments following
+ * it) to stderr, prefixing it with the provided file/line/function information
+ * and the path to the MTD device that the MTD context provided in 'ctx' is
+ * associated with.
+ */
+static void mtd_debug_location(const char *file, int line, const char *func,
+			       const struct mtd_ctx *ctx, const char *fmt,
+			       ...) {
+	char format[1024];
+	va_list args;
+	int ret;
+
+	if (log_level < 1) {
+		return;
+	}
+
+	ret = log_format(format, sizeof(format), "%s: %s", ctx->mtd_path, fmt);
+	if (ret < 0) {
+		return;
+	}
+
+	va_start(args, fmt);
+	log_location_varargs(file, line, func, format, args);
+	va_end(args);
+}
+
+#define mtd_debug_hexdump(ctx, fmt, ...)                                       \
+	mtd_debug_hexdump_location(__FILE__, __LINE__, __func__, ctx, fmt,     \
+				   ##__VA_ARGS__)
+
+/*
+ * Helper macro to reduce code repetition in mtd_debug_hexdump_location().
+ */
+#define HEXDUMP_APPEND(fmt, ...)                                               \
+	{                                                                      \
+		int ret = snprintf(hex + hex_pos, sizeof(hex) - hex_pos, fmt,  \
+				   ##__VA_ARGS__);                             \
+		if (ret < 0 || (unsigned int)ret >= sizeof(hex) - hex_pos) {   \
+			return;                                                \
+		}                                                              \
+		hex_pos += ret;                                                \
+	}
+
+/*
+ * Print a hex dump of up to the first 32 bytes of a NAND chunk read by
+ * mtd_read_chunk() or written by mtd_write_chunk().  Only used for debugging;
+ * requires -v -v to be specified on the command line in order to do anything.
+ */
+static void mtd_debug_hexdump_location(const char *file, int line,
+				       const char *func,
+				       const struct mtd_ctx *ctx, const u8 *buf,
+				       int buf_len, const char *description) {
+	unsigned char hex_pos = 0;
+	char hex[128];
+
+	if (log_level < 2 || !buf || buf_len < 1) {
+		return;
+	}
+
+	for (int i = 0; i < (buf_len < 32 ? buf_len : 32); i++) {
+		if (i % 16 == 0) {
+			HEXDUMP_APPEND("    ");
+		}
+
+		HEXDUMP_APPEND("%02x ", buf[i]);
+
+		if (i % 16 == 15) {
+			HEXDUMP_APPEND("\n");
+		} else if (i % 8 == 7) {
+			HEXDUMP_APPEND(" ");
+		}
+	}
+
+	mtd_debug_location(file, line, func, ctx, "%s:\n%s%s", description, hex,
+			   buf_len > 32 ? "    ..." : "");
+}
+
+/*
+ * Check whether the given MTD block is a bad one.
+ *
+ * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
+ */
+static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
+	const struct mtd_ctx *ctx = dev->driver_context;
+	const struct mtd_info_user *mtd = &ctx->mtd;
+	off_t offset = block_no * mtd->erasesize;
+	int err = 0;
+	int ret;
+
+	if (block_no < 0) {
+		mtd_debug(ctx, "block_no=%d", block_no);
+		return YAFFS_FAIL;
+	}
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMGETBADBLOCK, &offset);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	mtd_debug(ctx, "ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+		  block_no, ret, err, util_get_error(err));
+
+	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
+}
+
+/*
+ * Erase the given MTD block.
+ *
+ * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
+ */
+static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
+	const struct mtd_ctx *ctx = dev->driver_context;
+	const struct mtd_info_user *mtd = &ctx->mtd;
+	off_t offset = block_no * mtd->erasesize;
+	int err = 0;
+	int ret;
+
+	if (block_no < 0) {
+		mtd_debug(ctx, "block_no=%d", block_no);
+		return YAFFS_FAIL;
+	}
+
+	struct erase_info_user64 einfo64 = {
+		.start = offset,
+		.length = mtd->erasesize,
+	};
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMERASE64, &einfo64);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	mtd_debug(ctx, "ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)",
+		  block_no, ret, err, util_get_error(err));
+
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
+}
+
+/*
+ * Mark the given MTD block as bad.
+ *
+ * (This is the 'drv_mark_bad_fn' callback of struct yaffs_driver.)
+ */
+static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
+	const struct mtd_ctx *ctx = dev->driver_context;
+	const struct mtd_info_user *mtd = &ctx->mtd;
+	off_t offset = block_no * mtd->erasesize;
+	int err = 0;
+	int ret;
+
+	if (block_no < 0) {
+		mtd_debug(ctx, "block_no=%d", block_no);
+		return YAFFS_FAIL;
+	}
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMSETBADBLOCK, &offset);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	mtd_debug(ctx, "ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+		  block_no, ret, err, util_get_error(err));
+
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
+}
+
+/*
+ * Helper function for mtd_read_chunk() that translates the result code of the
+ * ioctl() system call into an <ECC result, Yaffs result code> tuple.  Yaffs
+ * uses these values to properly handle deficiencies in flash memory.
+ */
+static int mtd_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
+	switch (read_result) {
+	case -EUCLEAN:
+		*ecc_result = YAFFS_ECC_RESULT_FIXED;
+		return YAFFS_OK;
+	case -EBADMSG:
+		*ecc_result = YAFFS_ECC_RESULT_UNFIXED;
+		return YAFFS_FAIL;
+	case 0:
+		*ecc_result = YAFFS_ECC_RESULT_NO_ERROR;
+		return YAFFS_OK;
+	default:
+		*ecc_result = YAFFS_ECC_RESULT_UNKNOWN;
+		return YAFFS_FAIL;
+	}
+}
+
+/*
+ * Read a data+OOB chunk from the MTD.
+ *
+ * (This is the 'drv_read_chunk_fn' callback of struct yaffs_driver.)
+ */
+static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
+			  int data_len, u8 *oob, int oob_len,
+			  enum yaffs_ecc_result *ecc_result_out) {
+	const struct mtd_ctx *ctx = dev->driver_context;
+	const struct mtd_info_user *mtd = &ctx->mtd;
+	off_t offset = nand_chunk * mtd->writesize;
+	enum yaffs_ecc_result ecc_result;
+	int err = 0;
+	int ret;
+
+	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
+		mtd_debug(ctx, "nand_chunk=%d, data_len=%d, oob_len=%d",
+			  nand_chunk, data_len, oob_len);
+		return YAFFS_FAIL;
+	}
+
+	struct mtd_read_req req = {
+		.start = offset,
+		.len = data_len,
+		.ooblen = oob_len,
+		.usr_data = (uintptr_t)data,
+		.usr_oob = (uintptr_t)oob,
+		.mode = dev->param.is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
+	};
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMREAD, &req);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	mtd_debug(ctx,
+		  "ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
+		  "err=%d (%s)",
+		  nand_chunk, data, data_len, oob, oob_len, ret, err,
+		  util_get_error(err));
+	mtd_debug_hexdump(ctx, data, data_len, "data");
+	mtd_debug_hexdump(ctx, oob, oob_len, "oob");
+
+	ret = mtd_ecc_result(ret, &ecc_result);
+
+	if (ecc_result_out) {
+		*ecc_result_out = ecc_result;
+	}
+
+	return ret;
+}
+
+/*
+ * Write a data+OOB chunk to the MTD.
+ *
+ * (This is the 'drv_write_chunk_fn' callback of struct yaffs_driver.)
+ */
+static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
+			   const u8 *data, int data_len, const u8 *oob,
+			   int oob_len) {
+	const struct mtd_ctx *ctx = dev->driver_context;
+	const struct mtd_info_user *mtd = &ctx->mtd;
+	off_t offset = nand_chunk * mtd->writesize;
+	int err = 0;
+	int ret;
+
+	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
+		mtd_debug(ctx, "nand_chunk=%d, data_len=%d, oob_len=%d",
+			  nand_chunk, data_len, oob_len);
+		return YAFFS_FAIL;
+	}
+
+	struct mtd_write_req req = {
+		.start = offset,
+		.len = data_len,
+		.ooblen = oob_len,
+		.usr_data = (uintptr_t)data,
+		.usr_oob = (uintptr_t)oob,
+		.mode = dev->param.is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
+	};
+
+	ret = linux_ioctl(ctx->mtd_fd, MEMWRITE, &req);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	mtd_debug(ctx,
+		  "ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
+		  "ret=%d, err=%d (%s)",
+		  nand_chunk, data, data_len, oob, oob_len, ret, err,
+		  util_get_error(err));
+	mtd_debug_hexdump(ctx, data, data_len, "data");
+	mtd_debug_hexdump(ctx, oob, oob_len, "oob");
+
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
+}
+
+/*
+ * Yaffs driver structure that is passed along the MTD layout information to
+ * yaffs_add_device().
+ */
+const struct yaffs_driver yaffs_driver_mtd = {
+	.drv_check_bad_fn = mtd_check_bad,
+	.drv_erase_fn = mtd_erase_block,
+	.drv_mark_bad_fn = mtd_mark_bad,
+	.drv_read_chunk_fn = mtd_read_chunk,
+	.drv_write_chunk_fn = mtd_write_chunk,
+};
