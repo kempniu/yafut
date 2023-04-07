@@ -4,4 +4,6 @@
 
 #include <yaffs_guts.h>
 
-extern const struct yaffs_driver yaffs_driver_mtd;
+int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
+	      unsigned int block_size);
+void ydrv_destroy(struct yaffs_dev *yaffs_dev);

@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 
 #include <yaffs_guts.h>
@@ -20,11 +21,10 @@
 /*
  * Structure passed around in the 'driver_context' field of struct yaffs_dev.
  */
-struct mtd_ctx {
-	struct mtd_info_user mtd;
-	struct yaffs_dev *yaffs_dev;
-	const char *mtd_path;
+struct ydrv_ctx {
 	int mtd_fd;
+	unsigned int chunk_size;
+	unsigned int block_size;
 };
 
 #define mtd_debug(fmt, ...)                                                    \
@@ -105,9 +105,8 @@ static void mtd_debug_hexdump_location(const char *file, int line,
  * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
  */
 static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
-	const struct mtd_ctx *ctx = dev->driver_context;
-	const struct mtd_info_user *mtd = &ctx->mtd;
-	off_t offset = block_no * mtd->erasesize;
+	const struct ydrv_ctx *ctx = dev->driver_context;
+	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -133,9 +132,8 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
  * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
  */
 static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
-	const struct mtd_ctx *ctx = dev->driver_context;
-	const struct mtd_info_user *mtd = &ctx->mtd;
-	off_t offset = block_no * mtd->erasesize;
+	const struct ydrv_ctx *ctx = dev->driver_context;
+	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -146,7 +144,7 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
 
 	struct erase_info_user64 einfo64 = {
 		.start = offset,
-		.length = mtd->erasesize,
+		.length = ctx->block_size,
 	};
 
 	ret = linux_ioctl(ctx->mtd_fd, MEMERASE64, &einfo64);
@@ -170,9 +168,8 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
  * (This is the 'drv_mark_bad_fn' callback of struct yaffs_driver.)
  */
 static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
-	const struct mtd_ctx *ctx = dev->driver_context;
-	const struct mtd_info_user *mtd = &ctx->mtd;
-	off_t offset = block_no * mtd->erasesize;
+	const struct ydrv_ctx *ctx = dev->driver_context;
+	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -226,9 +223,8 @@ static int mtd_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
 static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 			  int data_len, u8 *oob, int oob_len,
 			  enum yaffs_ecc_result *ecc_result_out) {
-	const struct mtd_ctx *ctx = dev->driver_context;
-	const struct mtd_info_user *mtd = &ctx->mtd;
-	off_t offset = nand_chunk * mtd->writesize;
+	const struct ydrv_ctx *ctx = dev->driver_context;
+	off_t offset = nand_chunk * ctx->chunk_size;
 	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
@@ -277,9 +273,8 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 			   const u8 *data, int data_len, const u8 *oob,
 			   int oob_len) {
-	const struct mtd_ctx *ctx = dev->driver_context;
-	const struct mtd_info_user *mtd = &ctx->mtd;
-	off_t offset = nand_chunk * mtd->writesize;
+	const struct ydrv_ctx *ctx = dev->driver_context;
+	off_t offset = nand_chunk * ctx->chunk_size;
 	int err = 0;
 	int ret;
 
@@ -318,13 +313,48 @@ static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 }
 
 /*
- * Yaffs driver structure that is passed along the MTD layout information to
- * yaffs_add_device().
+ * Yaffs driver structure stored by ydrv_init() in the struct yaffs_dev that
+ * init_mtd_context() (in src/mtd.c) passes to yaffs_add_device().
  */
-const struct yaffs_driver yaffs_driver_mtd = {
+static const struct yaffs_driver ydrv = {
 	.drv_check_bad_fn = mtd_check_bad,
 	.drv_erase_fn = mtd_erase_block,
 	.drv_mark_bad_fn = mtd_mark_bad,
 	.drv_read_chunk_fn = mtd_read_chunk,
 	.drv_write_chunk_fn = mtd_write_chunk,
+};
+
+/*
+ * Initialize 'yaffs_dev->drv' with pointers to callbacks necessary for Yaffs
+ * code to do its job.  Save a pointer to a structure holding all the data that
+ * needs to be kept around while the Yaffs file system is in use in
+ * 'yaffs_dev->driver_context'.
+ */
+int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
+	      unsigned int block_size) {
+	struct ydrv_ctx *ctx;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		return -ENOMEM;
+	}
+
+	*ctx = (struct ydrv_ctx){
+		.mtd_fd = mtd_fd,
+		.chunk_size = chunk_size,
+		.block_size = block_size,
+	};
+
+	yaffs_dev->drv = ydrv;
+	yaffs_dev->driver_context = ctx;
+
+	return 0;
+}
+
+/*
+ * Free the structure holding all the data that needs to be kept around while
+ * the Yaffs file system is in use.
+ */
+void ydrv_destroy(struct yaffs_dev *yaffs_dev) {
+	free(yaffs_dev->driver_context);
 };

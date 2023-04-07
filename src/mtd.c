@@ -197,8 +197,6 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
 			.is_yaffs2 = is_yaffs2,
 			.inband_tags = inband_tags,
 		},
-		.drv = yaffs_driver_mtd,
-		.driver_context = ctx,
 	};
 
 	mtd_debug(ctx,
@@ -211,8 +209,6 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
 		  ctx->yaffs_dev->param.end_block,
 		  ctx->yaffs_dev->param.is_yaffs2,
 		  ctx->yaffs_dev->param.inband_tags);
-
-	yaffs_add_device(ctx->yaffs_dev);
 
 	return 0;
 }
@@ -254,10 +250,21 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_close_mtd_fd;
 	}
 
+	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, ctx->mtd.writesize,
+			ctx->mtd.erasesize);
+	if (ret < 0) {
+		log_error(ret, "unable to initialize Yaffs driver");
+		goto err_free_yaffs_dev;
+	}
+
+	yaffs_add_device(ctx->yaffs_dev);
+
 	*ctxp = ctx;
 
 	return 0;
 
+err_free_yaffs_dev:
+	free(ctx->yaffs_dev);
 err_close_mtd_fd:
 	close(ctx->mtd_fd);
 err_free_ctx:
@@ -274,8 +281,10 @@ static void destroy_mtd_context(struct mtd_ctx **ctxp) {
 
 	*ctxp = NULL;
 
-	close(ctx->mtd_fd);
+	ydrv_destroy(ctx->yaffs_dev);
+
 	free(ctx->yaffs_dev);
+	close(ctx->mtd_fd);
 	free(ctx);
 }
 
