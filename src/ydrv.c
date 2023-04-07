@@ -5,10 +5,12 @@
 #include <errno.h>
 #include <mtd/mtd-user.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
 #include <yaffs_guts.h>
 #include <yportenv.h>
@@ -23,6 +25,7 @@
  */
 struct ydrv_ctx {
 	int mtd_fd;
+	enum ydrv_mtd_type mtd_type;
 	unsigned int chunk_size;
 	unsigned int block_size;
 };
@@ -68,8 +71,9 @@ static void ydrv_debug_location(const char *file, int line, const char *func,
 
 /*
  * Print a hex dump of up to the first 32 bytes of a NAND chunk read by
- * ydrv_read_chunk() or written by ydrv_write_chunk().  Only used for debugging;
- * requires -v -v to be specified on the command line in order to do anything.
+ * ydrv_read_chunk_*() or written by ydrv_write_chunk_*().  Only used for
+ * debugging; requires -v -v to be specified on the command line in order to do
+ * anything.
  */
 static void ydrv_debug_hexdump_location(const char *file, int line,
 					const char *func, const u8 *buf,
@@ -107,10 +111,10 @@ static void ydrv_debug_hexdump_location(const char *file, int line,
  * first chunk of the following block).
  */
 static long long ydrv_get_data_offset_for_chunk(const struct ydrv_ctx *ctx,
-						int nand_chunk) {
+						int chunk) {
 	unsigned int chunks_per_block = ctx->block_size / ctx->chunk_size;
-	unsigned int block = nand_chunk / chunks_per_block;
-	unsigned int chunk_in_block = nand_chunk % chunks_per_block;
+	unsigned int block = chunk / chunks_per_block;
+	unsigned int chunk_in_block = chunk % chunks_per_block;
 
 	return (block * ctx->block_size) + (chunk_in_block * ctx->chunk_size);
 }
@@ -214,9 +218,9 @@ static int ydrv_mark_bad(struct yaffs_dev *dev, int block_no) {
 }
 
 /*
- * Helper function for ydrv_read_chunk() that translates the result code of the
- * ioctl() system call into an <ECC result, Yaffs result code> tuple.  Yaffs
- * uses these values to properly handle deficiencies in flash memory.
+ * Helper function for ydrv_read_chunk_*() that translates the result code of a
+ * system call into an <ECC result, Yaffs result code> tuple.  Yaffs uses these
+ * values to properly handle deficiencies in flash memory.
  */
 static int ydrv_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
 	switch (read_result) {
@@ -236,24 +240,16 @@ static int ydrv_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
 }
 
 /*
- * Read a data+OOB chunk from the MTD.
- *
- * (This is the 'drv_read_chunk_fn' callback of struct yaffs_driver.)
+ * Read a data+OOB chunk from NAND flash.
  */
-static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
-			   int data_len, u8 *oob, int oob_len,
-			   enum yaffs_ecc_result *ecc_result_out) {
-	const struct ydrv_ctx *ctx = dev->driver_context;
-	long long offset = ydrv_get_data_offset_for_chunk(ctx, nand_chunk);
+static int ydrv_read_chunk_nand(const struct ydrv_ctx *ctx, int chunk, u8 *data,
+				int data_len, u8 *oob, int oob_len,
+				enum yaffs_ecc_result *ecc_result_out,
+				bool is_yaffs2) {
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
 	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
-
-	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		ydrv_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
-			   data_len, oob_len);
-		return YAFFS_FAIL;
-	}
 
 	struct mtd_read_req req = {
 		.start = offset,
@@ -261,7 +257,7 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 		.ooblen = oob_len,
 		.usr_data = (uintptr_t)data,
 		.usr_oob = (uintptr_t)oob,
-		.mode = dev->param.is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
+		.mode = is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
 	};
 
 	ret = linux_ioctl(ctx->mtd_fd, MEMREAD, &req);
@@ -271,8 +267,8 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 
 	ydrv_debug("ioctl=MEMREAD, chunk=%d, offset=%lld (0x%08llx), "
 		   "data=%p (%d), oob=%p (%d), ret=%d, err=%d (%s)",
-		   nand_chunk, offset, offset, data, data_len, oob, oob_len,
-		   ret, err, util_get_error(err));
+		   chunk, offset, offset, data, data_len, oob, oob_len, ret,
+		   err, util_get_error(err));
 	ydrv_debug_hexdump(data, data_len, "data");
 	ydrv_debug_hexdump(oob, oob_len, "oob");
 
@@ -286,23 +282,76 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 }
 
 /*
- * Write a data+OOB chunk to the MTD.
- *
- * (This is the 'drv_write_chunk_fn' callback of struct yaffs_driver.)
+ * Read a data chunk from NOR flash.
  */
-static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
-			    const u8 *data, int data_len, const u8 *oob,
-			    int oob_len) {
-	const struct ydrv_ctx *ctx = dev->driver_context;
-	long long offset = ydrv_get_data_offset_for_chunk(ctx, nand_chunk);
+static int ydrv_read_chunk_nor(const struct ydrv_ctx *ctx, int chunk, u8 *data,
+			       int data_len,
+			       enum yaffs_ecc_result *ecc_result_out) {
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
+	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
 
-	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		ydrv_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
-			   data_len, oob_len);
+	ret = pread(ctx->mtd_fd, data, data_len, offset);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	ydrv_debug("pread, chunk=%d, offset=%lld (0x%08llx), data=%p (%d), "
+		   "ret=%d, err=%d (%s)",
+		   chunk, offset, offset, data, data_len, ret, err,
+		   util_get_error(err));
+	ydrv_debug_hexdump(data, data_len, "data");
+
+	ret = ydrv_ecc_result(ret < 0 ? ret : 0, &ecc_result);
+
+	if (ecc_result_out) {
+		*ecc_result_out = ecc_result;
+	}
+
+	return ret;
+}
+
+/*
+ * Read a data+OOB chunk from the MTD.
+ *
+ * (This is the 'drv_read_chunk_fn' callback of struct yaffs_driver.)
+ */
+static int ydrv_read_chunk(struct yaffs_dev *dev, int chunk, u8 *data,
+			   int data_len, u8 *oob, int oob_len,
+			   enum yaffs_ecc_result *ecc_result_out) {
+	const struct ydrv_ctx *ctx = dev->driver_context;
+
+	if (chunk < 0 || data_len < 0 || oob_len < 0) {
+		ydrv_debug("chunk=%d, data_len=%d, oob_len=%d", chunk, data_len,
+			   oob_len);
 		return YAFFS_FAIL;
 	}
+
+	switch (ctx->mtd_type) {
+	case MTD_TYPE_NAND:
+		return ydrv_read_chunk_nand(ctx, chunk, data, data_len, oob,
+					    oob_len, ecc_result_out,
+					    dev->param.is_yaffs2);
+	case MTD_TYPE_NOR:
+		return ydrv_read_chunk_nor(ctx, chunk, data, data_len,
+					   ecc_result_out);
+
+	default:
+		log("unknown MTD type %d", ctx->mtd_type);
+		return YAFFS_FAIL;
+	}
+}
+
+/*
+ * Write a data+OOB chunk to NAND flash.
+ */
+static int ydrv_write_chunk_nand(const struct ydrv_ctx *ctx, int chunk,
+				 const u8 *data, int data_len, const u8 *oob,
+				 int oob_len, bool is_yaffs2) {
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
+	int err = 0;
+	int ret;
 
 	struct mtd_write_req req = {
 		.start = offset,
@@ -310,7 +359,7 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 		.ooblen = oob_len,
 		.usr_data = (uintptr_t)data,
 		.usr_oob = (uintptr_t)oob,
-		.mode = dev->param.is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
+		.mode = is_yaffs2 ? MTD_OPS_AUTO_OOB : MTD_OPS_RAW,
 	};
 
 	ret = linux_ioctl(ctx->mtd_fd, MEMWRITE, &req);
@@ -320,8 +369,8 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 
 	ydrv_debug("ioctl=MEMWRITE, chunk=%d, offset=%lld (0x%08llx), "
 		   "data=%p (%d), oob=%p (%d), ret=%d, err=%d (%s)",
-		   nand_chunk, offset, offset, data, data_len, oob, oob_len,
-		   ret, err, util_get_error(err));
+		   chunk, offset, offset, data, data_len, oob, oob_len, ret,
+		   err, util_get_error(err));
 	ydrv_debug_hexdump(data, data_len, "data");
 	ydrv_debug_hexdump(oob, oob_len, "oob");
 
@@ -330,6 +379,60 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 	}
 
 	return YAFFS_OK;
+}
+
+/*
+ * Write a data chunk to NOR flash.
+ */
+static int ydrv_write_chunk_nor(const struct ydrv_ctx *ctx, int chunk,
+				const u8 *data, int data_len) {
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
+	int err = 0;
+	int ret;
+
+	ret = pwrite(ctx->mtd_fd, data, data_len, offset);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	ydrv_debug("pwrite, chunk=%d, offset=%lld (0x%08llx), data=%p (%d), "
+		   "ret=%d, err=%d (%s)",
+		   chunk, offset, offset, data, data_len, ret, err,
+		   util_get_error(err));
+	ydrv_debug_hexdump(data, data_len, "data");
+
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
+}
+
+/*
+ * Write a data+OOB chunk to the MTD.
+ *
+ * (This is the 'drv_write_chunk_fn' callback of struct yaffs_driver.)
+ */
+static int ydrv_write_chunk(struct yaffs_dev *dev, int chunk, const u8 *data,
+			    int data_len, const u8 *oob, int oob_len) {
+	const struct ydrv_ctx *ctx = dev->driver_context;
+
+	if (chunk < 0 || data_len < 0 || oob_len < 0) {
+		ydrv_debug("chunk=%d, data_len=%d, oob_len=%d", chunk, data_len,
+			   oob_len);
+		return YAFFS_FAIL;
+	}
+
+	switch (ctx->mtd_type) {
+	case MTD_TYPE_NAND:
+		return ydrv_write_chunk_nand(ctx, chunk, data, data_len, oob,
+					     oob_len, dev->param.is_yaffs2);
+	case MTD_TYPE_NOR:
+		return ydrv_write_chunk_nor(ctx, chunk, data, data_len);
+	default:
+		log("unknown MTD type %d", ctx->mtd_type);
+		return YAFFS_FAIL;
+	}
 }
 
 /*
@@ -350,7 +453,8 @@ static const struct yaffs_driver ydrv = {
  * needs to be kept around while the Yaffs file system is in use in
  * 'yaffs_dev->driver_context'.
  */
-int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
+int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd,
+	      enum ydrv_mtd_type mtd_type, unsigned int chunk_size,
 	      unsigned int block_size) {
 	struct ydrv_ctx *ctx;
 
@@ -361,6 +465,7 @@ int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
 
 	*ctx = (struct ydrv_ctx){
 		.mtd_fd = mtd_fd,
+		.mtd_type = mtd_type,
 		.chunk_size = chunk_size,
 		.block_size = block_size,
 	};
