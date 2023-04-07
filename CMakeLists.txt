@@ -65,6 +65,7 @@ add_executable(
 	src/options.c
 	src/util.c
 	src/yaffs_glue.c
+	src/ydrv.c
 )
 
 set_target_properties(
