@@ -30,7 +30,9 @@ file system compiled in.
 
 ### Runtime Requirements
 
- - Linux kernel 6.1+ with MTD support enabled
+ - Linux kernel with MTD support enabled
+    - Linux kernel 6.1 or newer for NAND flash
+    - Linux kernel 3.2 or newer for NOR flash
  - glibc or musl libc (other C standard libraries should also work, but
    have not been tested)
 
@@ -66,13 +68,13 @@ Run `yafut -h` for further usage instructions.
 
 ## FAQ
 
-### Which Yaffs file system versions does this tool work with?
+### Which flash memory types does this tool work with?
 
-Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
-systems.  Yafut assumes that MTD devices with 512-byte pages use Yaffs1
-while those with 1024-byte or larger pages use Yaffs2.  There is
-currently no way to override this assumption other than by modifying the
-source code.
+Yafut supports both NAND flash and NOR flash.  However, while most
+parameters for an existing Yaffs file system stored on NAND flash can be
+autodetected, the Yaffs layout used on NOR flash can be fairly arbitrary
+and therefore Yaffs parameters for such a file system will likely need
+to be provided manually (see the next question below).
 
 ### Do I need to manually set any Yaffs parameters?
 
@@ -104,18 +106,34 @@ options are:
     system does not use ECC for tags, the `-E` command-line option can
     be used to tell Yafut to act accordingly.
 
-### Does this tool really only work with Linux kernel 6.1+?
+### Which Yaffs file system versions does this tool work with?
+
+Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
+systems.  Yafut assumes that NAND devices with 512-byte pages use Yaffs1
+while those with 1024-byte or larger pages use Yaffs2.  All NOR devices
+are assumed to use Yaffs2 by default.  While the autodetected Yaffs
+layout can be tweaked using the `-C` and `-B` command-line options (see
+above), there is currently no way to override the chunk size threshold
+used for autodetecting the Yaffs file system version used.
+
+### What's the deal with the Linux kernel version requirements?
 
 Linux kernel version 6.1 is the first one that implements all the MTD
-ioctls that Yafut needs to do its job - specifically, it is the first
-kernel version that supports the MEMREAD ioctl, which enables userspace
-applications to use the Linux kernel's OOB autoplacement mechanism while
-reading data from NAND devices (see also the next question).
+ioctls that Yafut needs to do its job on NAND flash - specifically, it
+is the first kernel version that supports the MEMREAD ioctl, which
+enables userspace applications to use the Linux kernel's OOB
+autoplacement mechanism while reading data from NAND devices (see also
+the next question).
 
 While Yafut can be *built* on hosts on which the Linux kernel headers do
 not include the definition of the MEMREAD ioctl, it needs Linux kernel
-version 6.1+ to actually *work*.  (An older, custom kernel version with
-a backported implementation of the MEMREAD ioctl can also be used).
+version 6.1+ to actually *work* on NAND flash.  (An older, custom kernel
+version with a backported implementation of the MEMREAD ioctl can also
+be used).
+
+As Yafut does not need the MEMREAD ioctl to handle NOR flash, only Linux
+kernel 3.2 or newer is necessary for Yafut to work on that type of flash
+memory.
 
 ### Do I need to know the OOB (spare) area layout of my NAND device?
 
