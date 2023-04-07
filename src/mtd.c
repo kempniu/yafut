@@ -204,7 +204,7 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 		return -ENOMEM;
 	}
 
-	is_yaffs2 = (chunk_size >= 2048);
+	is_yaffs2 = (chunk_size >= 1024);
 	inband_tags = (is_yaffs2
 		       && (oobavail < sizeof(struct yaffs_packed_tags2)
 			   || force_inband_tags));

@@ -70,8 +70,9 @@ Run `yafut -h` for further usage instructions.
 
 Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
 systems.  Yafut assumes that MTD devices with 512-byte pages use Yaffs1
-while those with 2048-byte pages use Yaffs2.  There is currently no way
-to override this assumption other than by modifying the source code.
+while those with 1024-byte or larger pages use Yaffs2.  There is
+currently no way to override this assumption other than by modifying the
+source code.
 
 ### Do I need to manually set any Yaffs parameters?
 
