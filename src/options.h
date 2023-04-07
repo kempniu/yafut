@@ -13,6 +13,8 @@
 	"-i <src> "                                                            \
 	"-o <dst> "                                                            \
 	"[ -m <mode> ] "                                                       \
+	"[ -C <bytes> ] "                                                      \
+	"[ -B <bytes> ] "                                                      \
 	"[ -T ] "                                                              \
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
@@ -24,6 +26,8 @@
 	"    -o  path to the destination file (use '-' to write to stdout)\n"  \
 	"    -m  set destination file access permissions to <mode> (octal)\n"  \
 	"        (default: copy access permissions from <src>)\n"              \
+	"    -C  force Yaffs chunk size to <bytes> (use 'k' suffix for KiB)\n" \
+	"    -B  force Yaffs block size to <bytes> (use 'k' suffix for KiB)\n" \
 	"    -T  force inband tags\n"                                          \
 	"    -v  verbose output (can be used up to two times)\n"               \
 	"    -h  show usage information and exit\n"
@@ -35,6 +39,7 @@ enum program_mode {
 };
 
 #define FILE_MODE_UNSPECIFIED -1
+#define SIZE_UNSPECIFIED -1
 
 struct opts {
 	enum program_mode mode;
@@ -42,6 +47,8 @@ struct opts {
 	const char *src_path;
 	const char *dst_path;
 	int dst_mode;
+	int chunk_size;
+	int block_size;
 	bool force_inband_tags;
 };
 
