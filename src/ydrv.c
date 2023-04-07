@@ -136,8 +136,9 @@ static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	ydrv_debug("ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
-		   block_no, ret, err, util_get_error(err));
+	ydrv_debug("ioctl=MEMGETBADBLOCK, block=%d, offset=%lld (0x%08llx), "
+		   "ret=%d, err=%d (%s)",
+		   block_no, offset, offset, ret, err, util_get_error(err));
 
 	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
 }
@@ -168,8 +169,10 @@ static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	ydrv_debug("ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)", block_no,
-		   ret, err, util_get_error(err));
+	ydrv_debug(
+		"ioctl=MEMERASE64, block=%d, offset=%lld (0x%08llx), ret=%d, "
+		"err=%d (%s)",
+		block_no, offset, offset, ret, err, util_get_error(err));
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -199,8 +202,9 @@ static int ydrv_mark_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	ydrv_debug("ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
-		   block_no, ret, err, util_get_error(err));
+	ydrv_debug("ioctl=MEMSETBADBLOCK, block=%d, offset=%lld (0x%08llx), "
+		   "ret=%d, err=%d (%s)",
+		   block_no, offset, offset, ret, err, util_get_error(err));
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -265,11 +269,10 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 		err = util_get_errno();
 	}
 
-	ydrv_debug(
-		"ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
-		"err=%d (%s)",
-		nand_chunk, data, data_len, oob, oob_len, ret, err,
-		util_get_error(err));
+	ydrv_debug("ioctl=MEMREAD, chunk=%d, offset=%lld (0x%08llx), "
+		   "data=%p (%d), oob=%p (%d), ret=%d, err=%d (%s)",
+		   nand_chunk, offset, offset, data, data_len, oob, oob_len,
+		   ret, err, util_get_error(err));
 	ydrv_debug_hexdump(data, data_len, "data");
 	ydrv_debug_hexdump(oob, oob_len, "oob");
 
@@ -315,10 +318,10 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 		err = util_get_errno();
 	}
 
-	ydrv_debug("ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
-		   "ret=%d, err=%d (%s)",
-		   nand_chunk, data, data_len, oob, oob_len, ret, err,
-		   util_get_error(err));
+	ydrv_debug("ioctl=MEMWRITE, chunk=%d, offset=%lld (0x%08llx), "
+		   "data=%p (%d), oob=%p (%d), ret=%d, err=%d (%s)",
+		   nand_chunk, offset, offset, data, data_len, oob, oob_len,
+		   ret, err, util_get_error(err));
 	ydrv_debug_hexdump(data, data_len, "data");
 	ydrv_debug_hexdump(oob, oob_len, "oob");
 
