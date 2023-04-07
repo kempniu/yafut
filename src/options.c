@@ -86,10 +86,32 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 	*opts = (struct opts){
 		.mode = PROGRAM_MODE_UNSPECIFIED,
 		.dst_mode = FILE_MODE_UNSPECIFIED,
+		.chunk_size = SIZE_UNSPECIFIED,
+		.block_size = SIZE_UNSPECIFIED,
 	};
 
-	while ((opt = getopt(argc, argv, "d:hi:m:o:rTvw")) != -1) {
+	while ((opt = getopt(argc, argv, "B:C:d:hi:m:o:rTvw")) != -1) {
 		switch (opt) {
+		case 'B':
+			if (opts->block_size != SIZE_UNSPECIFIED) {
+				log("-B can only be used once");
+				return -1;
+			}
+			if (parse_int(optarg, 10, true, &opts->block_size)
+			    < 0) {
+				return -1;
+			}
+			break;
+		case 'C':
+			if (opts->chunk_size != SIZE_UNSPECIFIED) {
+				log("-C can only be used once");
+				return -1;
+			}
+			if (parse_int(optarg, 10, true, &opts->chunk_size)
+			    < 0) {
+				return -1;
+			}
+			break;
 		case 'd':
 			if (opts->device_path) {
 				log("-d can only be used once");

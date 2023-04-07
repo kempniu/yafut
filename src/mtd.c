@@ -135,7 +135,7 @@ static int read_oobavail_from_sysfs(const char *mtd_path,
  * most of them in 'mtd'; store the number of available bytes in the OOB area
  * in 'oobavail_out'.
  */
-static int discover_mtd_parameters(struct mtd_ctx *ctx,
+static int discover_mtd_parameters(const struct mtd_ctx *ctx,
 				   struct mtd_info_user *mtd,
 				   unsigned int *oobavail_out) {
 	unsigned int oobavail;
@@ -166,10 +166,36 @@ static int discover_mtd_parameters(struct mtd_ctx *ctx,
 }
 
 /*
+ * Determine the values to use for 'chunk_size' and 'block_size': use
+ * autodetected MTD parameters provided in 'mtd' unless -C and/or -B were used.
+ */
+static void init_yaffs_geometry(const struct mtd_ctx *ctx,
+				const struct mtd_info_user *mtd,
+				const struct opts *opts,
+				unsigned int *chunk_size,
+				unsigned int *block_size) {
+	*chunk_size = mtd->writesize;
+	*block_size = mtd->erasesize;
+
+	if (opts->chunk_size != SIZE_UNSPECIFIED) {
+		mtd_debug(ctx, "overriding chunk size to %d bytes",
+			  opts->chunk_size);
+		*chunk_size = opts->chunk_size;
+	}
+
+	if (opts->block_size != SIZE_UNSPECIFIED) {
+		mtd_debug(ctx, "overriding block size to %d bytes",
+			  opts->block_size);
+		*block_size = opts->block_size;
+	}
+}
+
+/*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
-static int init_yaffs_dev(struct mtd_ctx *ctx, struct mtd_info_user *mtd,
-			  unsigned int oobavail, bool force_inband_tags) {
+static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
+			  unsigned int oobavail, unsigned int chunk_size,
+			  unsigned int block_size, bool force_inband_tags) {
 	int inband_tags;
 	int is_yaffs2;
 
@@ -178,18 +204,18 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, struct mtd_info_user *mtd,
 		return -ENOMEM;
 	}
 
-	is_yaffs2 = (mtd->writesize >= 2048);
+	is_yaffs2 = (chunk_size >= 2048);
 	inband_tags = (is_yaffs2
 		       && (oobavail < sizeof(struct yaffs_packed_tags2)
 			   || force_inband_tags));
 
 	*ctx->yaffs_dev = (struct yaffs_dev) {
 		.param = {
-			.total_bytes_per_chunk = mtd->writesize,
-			.chunks_per_block = mtd->erasesize / mtd->writesize,
+			.total_bytes_per_chunk = chunk_size,
+			.chunks_per_block = block_size / chunk_size,
 			.spare_bytes_per_chunk = mtd->oobsize,
 			.start_block = 0,
-			.end_block = (mtd->size / mtd->erasesize) - 1,
+			.end_block = (mtd->size / block_size) - 1,
 			.n_reserved_blocks = 2,
 			.is_yaffs2 = is_yaffs2,
 			.inband_tags = inband_tags,
@@ -217,6 +243,8 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, struct mtd_info_user *mtd,
  */
 static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_info_user mtd;
+	unsigned int chunk_size;
+	unsigned int block_size;
 	unsigned int oobavail;
 	struct mtd_ctx *ctx;
 	int flags;
@@ -242,14 +270,16 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_close_mtd_fd;
 	}
 
-	ret = init_yaffs_dev(ctx, &mtd, oobavail, opts->force_inband_tags);
+	init_yaffs_geometry(ctx, &mtd, opts, &chunk_size, &block_size);
+
+	ret = init_yaffs_dev(ctx, &mtd, oobavail, chunk_size, block_size,
+			     opts->force_inband_tags);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;
 	}
 
-	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, mtd.writesize,
-			mtd.erasesize);
+	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, chunk_size, block_size);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs driver");
 		goto err_free_yaffs_dev;

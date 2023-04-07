@@ -82,14 +82,20 @@ in which case the educated guess attempted by Yafut may turn out to be
 wrong and specific values for certain Yaffs options will need to be
 forced by the user via command-line options.
 
-The only parameter whose autodetected value can currently be overridden
-is the use of inband tags.  Yafut assumes that inband tags are only
-necessary if the MTD does not have enough available bytes in the OOB
-area to store a full Yaffs2 tag structure (including tags ECC data).
-However, some file systems may use inband tags despite being stored on
-an MTD that does have enough available space in the OOB area to fit a
-full Yaffs2 tag structure.  For such file systems, the `-T` command-line
-option can be used to force use of inband tags.
+The Yaffs parameters that can currently be controlled using command-line
+options are:
+
+  - Chunk size (`-C`) and block size (`-B`).  Yafut uses autodetected
+    MTD parameters for these parameters by default, but they can be
+    forced to specific values if necessary.
+
+  - Use of inband tags (`-T`).  Yafut assumes that inband tags are only
+    necessary if the MTD does not have enough available bytes in the OOB
+    area to store a full Yaffs2 tag structure (including tags ECC data).
+    However, some file systems may use inband tags despite being stored
+    on an MTD that does have enough available space in the OOB area to
+    fit a full Yaffs2 tag structure.  For such file systems, the `-T`
+    command-line option can be used to force use of inband tags.
 
 ### Does this tool really only work with Linux kernel 6.1+?
 
