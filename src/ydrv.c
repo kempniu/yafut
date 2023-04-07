@@ -27,8 +27,8 @@ struct ydrv_ctx {
 	unsigned int block_size;
 };
 
-#define mtd_debug(fmt, ...)                                                    \
-	mtd_debug_location(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#define ydrv_debug(fmt, ...)                                                   \
+	ydrv_debug_location(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 
 /*
  * Print the message provided in 'fmt' (and any optional arguments following
@@ -36,8 +36,8 @@ struct ydrv_ctx {
  * information.  Only used for debugging; requires at least -v to be specified
  * on the command line in order to do anything.
  */
-static void mtd_debug_location(const char *file, int line, const char *func,
-			       const char *fmt, ...) {
+static void ydrv_debug_location(const char *file, int line, const char *func,
+				const char *fmt, ...) {
 	va_list args;
 
 	if (log_level < 1) {
@@ -49,12 +49,12 @@ static void mtd_debug_location(const char *file, int line, const char *func,
 	va_end(args);
 }
 
-#define mtd_debug_hexdump(fmt, ...)                                            \
-	mtd_debug_hexdump_location(__FILE__, __LINE__, __func__, fmt,          \
-				   ##__VA_ARGS__)
+#define ydrv_debug_hexdump(fmt, ...)                                           \
+	ydrv_debug_hexdump_location(__FILE__, __LINE__, __func__, fmt,         \
+				    ##__VA_ARGS__)
 
 /*
- * Helper macro to reduce code repetition in mtd_debug_hexdump_location().
+ * Helper macro to reduce code repetition in ydrv_debug_hexdump_location().
  */
 #define HEXDUMP_APPEND(fmt, ...)                                               \
 	{                                                                      \
@@ -68,12 +68,12 @@ static void mtd_debug_location(const char *file, int line, const char *func,
 
 /*
  * Print a hex dump of up to the first 32 bytes of a NAND chunk read by
- * mtd_read_chunk() or written by mtd_write_chunk().  Only used for debugging;
+ * ydrv_read_chunk() or written by ydrv_write_chunk().  Only used for debugging;
  * requires -v -v to be specified on the command line in order to do anything.
  */
-static void mtd_debug_hexdump_location(const char *file, int line,
-				       const char *func, const u8 *buf,
-				       int buf_len, const char *description) {
+static void ydrv_debug_hexdump_location(const char *file, int line,
+					const char *func, const u8 *buf,
+					int buf_len, const char *description) {
 	unsigned char hex_pos = 0;
 	char hex[128];
 
@@ -95,8 +95,8 @@ static void mtd_debug_hexdump_location(const char *file, int line,
 		}
 	}
 
-	mtd_debug_location(file, line, func, "%s:\n%s%s", description, hex,
-			   buf_len > 32 ? "    ..." : "");
+	ydrv_debug_location(file, line, func, "%s:\n%s%s", description, hex,
+			    buf_len > 32 ? "    ..." : "");
 }
 
 /*
@@ -104,14 +104,14 @@ static void mtd_debug_hexdump_location(const char *file, int line,
  *
  * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
  */
-static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
+static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
 	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug("block_no=%d", block_no);
+		ydrv_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -120,8 +120,8 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug("ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
-		  block_no, ret, err, util_get_error(err));
+	ydrv_debug("ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+		   block_no, ret, err, util_get_error(err));
 
 	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
 }
@@ -131,14 +131,14 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
  *
  * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
  */
-static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
+static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
 	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug("block_no=%d", block_no);
+		ydrv_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -152,8 +152,8 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug("ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)", block_no,
-		  ret, err, util_get_error(err));
+	ydrv_debug("ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)", block_no,
+		   ret, err, util_get_error(err));
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -167,14 +167,14 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
  *
  * (This is the 'drv_mark_bad_fn' callback of struct yaffs_driver.)
  */
-static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
+static int ydrv_mark_bad(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
 	off_t offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug("block_no=%d", block_no);
+		ydrv_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -183,8 +183,8 @@ static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug("ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
-		  block_no, ret, err, util_get_error(err));
+	ydrv_debug("ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+		   block_no, ret, err, util_get_error(err));
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -194,11 +194,11 @@ static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
 }
 
 /*
- * Helper function for mtd_read_chunk() that translates the result code of the
+ * Helper function for ydrv_read_chunk() that translates the result code of the
  * ioctl() system call into an <ECC result, Yaffs result code> tuple.  Yaffs
  * uses these values to properly handle deficiencies in flash memory.
  */
-static int mtd_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
+static int ydrv_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
 	switch (read_result) {
 	case -EUCLEAN:
 		*ecc_result = YAFFS_ECC_RESULT_FIXED;
@@ -220,9 +220,9 @@ static int mtd_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
  *
  * (This is the 'drv_read_chunk_fn' callback of struct yaffs_driver.)
  */
-static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
-			  int data_len, u8 *oob, int oob_len,
-			  enum yaffs_ecc_result *ecc_result_out) {
+static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
+			   int data_len, u8 *oob, int oob_len,
+			   enum yaffs_ecc_result *ecc_result_out) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
 	off_t offset = nand_chunk * ctx->chunk_size;
 	enum yaffs_ecc_result ecc_result;
@@ -230,8 +230,8 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 	int ret;
 
 	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		mtd_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
-			  data_len, oob_len);
+		ydrv_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
+			   data_len, oob_len);
 		return YAFFS_FAIL;
 	}
 
@@ -249,14 +249,15 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 		err = util_get_errno();
 	}
 
-	mtd_debug("ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
-		  "err=%d (%s)",
-		  nand_chunk, data, data_len, oob, oob_len, ret, err,
-		  util_get_error(err));
-	mtd_debug_hexdump(data, data_len, "data");
-	mtd_debug_hexdump(oob, oob_len, "oob");
+	ydrv_debug(
+		"ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
+		"err=%d (%s)",
+		nand_chunk, data, data_len, oob, oob_len, ret, err,
+		util_get_error(err));
+	ydrv_debug_hexdump(data, data_len, "data");
+	ydrv_debug_hexdump(oob, oob_len, "oob");
 
-	ret = mtd_ecc_result(ret, &ecc_result);
+	ret = ydrv_ecc_result(ret, &ecc_result);
 
 	if (ecc_result_out) {
 		*ecc_result_out = ecc_result;
@@ -270,17 +271,17 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
  *
  * (This is the 'drv_write_chunk_fn' callback of struct yaffs_driver.)
  */
-static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
-			   const u8 *data, int data_len, const u8 *oob,
-			   int oob_len) {
+static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
+			    const u8 *data, int data_len, const u8 *oob,
+			    int oob_len) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
 	off_t offset = nand_chunk * ctx->chunk_size;
 	int err = 0;
 	int ret;
 
 	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		mtd_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
-			  data_len, oob_len);
+		ydrv_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
+			   data_len, oob_len);
 		return YAFFS_FAIL;
 	}
 
@@ -298,12 +299,12 @@ static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 		err = util_get_errno();
 	}
 
-	mtd_debug("ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
-		  "ret=%d, err=%d (%s)",
-		  nand_chunk, data, data_len, oob, oob_len, ret, err,
-		  util_get_error(err));
-	mtd_debug_hexdump(data, data_len, "data");
-	mtd_debug_hexdump(oob, oob_len, "oob");
+	ydrv_debug("ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
+		   "ret=%d, err=%d (%s)",
+		   nand_chunk, data, data_len, oob, oob_len, ret, err,
+		   util_get_error(err));
+	ydrv_debug_hexdump(data, data_len, "data");
+	ydrv_debug_hexdump(oob, oob_len, "oob");
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -317,11 +318,11 @@ static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
  * init_mtd_context() (in src/mtd.c) passes to yaffs_add_device().
  */
 static const struct yaffs_driver ydrv = {
-	.drv_check_bad_fn = mtd_check_bad,
-	.drv_erase_fn = mtd_erase_block,
-	.drv_mark_bad_fn = mtd_mark_bad,
-	.drv_read_chunk_fn = mtd_read_chunk,
-	.drv_write_chunk_fn = mtd_write_chunk,
+	.drv_check_bad_fn = ydrv_check_bad,
+	.drv_erase_fn = ydrv_erase_block,
+	.drv_mark_bad_fn = ydrv_mark_bad,
+	.drv_read_chunk_fn = ydrv_read_chunk,
+	.drv_write_chunk_fn = ydrv_write_chunk,
 };
 
 /*
