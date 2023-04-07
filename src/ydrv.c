@@ -106,7 +106,7 @@ static void ydrv_debug_hexdump_location(const char *file, int line,
  */
 static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	off_t offset = block_no * ctx->block_size;
+	long long offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -133,7 +133,7 @@ static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
  */
 static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	off_t offset = block_no * ctx->block_size;
+	long long offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -169,7 +169,7 @@ static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
  */
 static int ydrv_mark_bad(struct yaffs_dev *dev, int block_no) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	off_t offset = block_no * ctx->block_size;
+	long long offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
 
@@ -224,7 +224,7 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 			   int data_len, u8 *oob, int oob_len,
 			   enum yaffs_ecc_result *ecc_result_out) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	off_t offset = nand_chunk * ctx->chunk_size;
+	long long offset = nand_chunk * ctx->chunk_size;
 	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
@@ -275,7 +275,7 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 			    const u8 *data, int data_len, const u8 *oob,
 			    int oob_len) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	off_t offset = nand_chunk * ctx->chunk_size;
+	long long offset = nand_chunk * ctx->chunk_size;
 	int err = 0;
 	int ret;
 
