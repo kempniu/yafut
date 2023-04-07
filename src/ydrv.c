@@ -23,6 +23,7 @@
  */
 struct ydrv_ctx {
 	int mtd_fd;
+	enum ydrv_mtd_type mtd_type;
 	unsigned int chunk_size;
 	unsigned int block_size;
 };
@@ -350,7 +351,8 @@ static const struct yaffs_driver ydrv = {
  * needs to be kept around while the Yaffs file system is in use in
  * 'yaffs_dev->driver_context'.
  */
-int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
+int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd,
+	      enum ydrv_mtd_type mtd_type, unsigned int chunk_size,
 	      unsigned int block_size) {
 	struct ydrv_ctx *ctx;
 
@@ -361,6 +363,7 @@ int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
 
 	*ctx = (struct ydrv_ctx){
 		.mtd_fd = mtd_fd,
+		.mtd_type = mtd_type,
 		.chunk_size = chunk_size,
 		.block_size = block_size,
 	};

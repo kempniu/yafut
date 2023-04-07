@@ -4,6 +4,12 @@
 
 #include <yaffs_guts.h>
 
-int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd, unsigned int chunk_size,
+enum ydrv_mtd_type {
+	MTD_TYPE_NAND,
+	MTD_TYPE_NOR,
+};
+
+int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd,
+	      enum ydrv_mtd_type mtd_type, unsigned int chunk_size,
 	      unsigned int block_size);
 void ydrv_destroy(struct yaffs_dev *yaffs_dev);
