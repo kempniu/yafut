@@ -44,7 +44,8 @@ struct mtd_ctx {
  * Print the message provided in 'fmt' (and any optional arguments following
  * it) to stderr, prefixing it with the provided file/line/function information
  * and the path to the MTD device that the MTD context provided in 'ctx' is
- * associated with.
+ * associated with.  Only used for debugging; requires at least -v to be
+ * specified on the command line in order to do anything.
  */
 static void mtd_debug_location(const char *file, int line, const char *func,
 			       const struct mtd_ctx *ctx, const char *fmt,

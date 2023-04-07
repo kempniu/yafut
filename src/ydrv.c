@@ -27,39 +27,30 @@ struct mtd_ctx {
 	int mtd_fd;
 };
 
-#define mtd_debug(ctx, fmt, ...)                                               \
-	mtd_debug_location(__FILE__, __LINE__, __func__, ctx, fmt,             \
-			   ##__VA_ARGS__)
+#define mtd_debug(fmt, ...)                                                    \
+	mtd_debug_location(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 
 /*
  * Print the message provided in 'fmt' (and any optional arguments following
- * it) to stderr, prefixing it with the provided file/line/function information
- * and the path to the MTD device that the MTD context provided in 'ctx' is
- * associated with.
+ * it) to stderr, prefixing it with the provided file/line/function
+ * information.  Only used for debugging; requires at least -v to be specified
+ * on the command line in order to do anything.
  */
 static void mtd_debug_location(const char *file, int line, const char *func,
-			       const struct mtd_ctx *ctx, const char *fmt,
-			       ...) {
-	char format[1024];
+			       const char *fmt, ...) {
 	va_list args;
-	int ret;
 
 	if (log_level < 1) {
 		return;
 	}
 
-	ret = log_format(format, sizeof(format), "%s: %s", ctx->mtd_path, fmt);
-	if (ret < 0) {
-		return;
-	}
-
 	va_start(args, fmt);
-	log_location_varargs(file, line, func, format, args);
+	log_location_varargs(file, line, func, fmt, args);
 	va_end(args);
 }
 
-#define mtd_debug_hexdump(ctx, fmt, ...)                                       \
-	mtd_debug_hexdump_location(__FILE__, __LINE__, __func__, ctx, fmt,     \
+#define mtd_debug_hexdump(fmt, ...)                                            \
+	mtd_debug_hexdump_location(__FILE__, __LINE__, __func__, fmt,          \
 				   ##__VA_ARGS__)
 
 /*
@@ -81,8 +72,7 @@ static void mtd_debug_location(const char *file, int line, const char *func,
  * requires -v -v to be specified on the command line in order to do anything.
  */
 static void mtd_debug_hexdump_location(const char *file, int line,
-				       const char *func,
-				       const struct mtd_ctx *ctx, const u8 *buf,
+				       const char *func, const u8 *buf,
 				       int buf_len, const char *description) {
 	unsigned char hex_pos = 0;
 	char hex[128];
@@ -105,7 +95,7 @@ static void mtd_debug_hexdump_location(const char *file, int line,
 		}
 	}
 
-	mtd_debug_location(file, line, func, ctx, "%s:\n%s%s", description, hex,
+	mtd_debug_location(file, line, func, "%s:\n%s%s", description, hex,
 			   buf_len > 32 ? "    ..." : "");
 }
 
@@ -122,7 +112,7 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug(ctx, "block_no=%d", block_no);
+		mtd_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -131,7 +121,7 @@ static int mtd_check_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug(ctx, "ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+	mtd_debug("ioctl=MEMGETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
 		  block_no, ret, err, util_get_error(err));
 
 	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
@@ -150,7 +140,7 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug(ctx, "block_no=%d", block_no);
+		mtd_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -164,8 +154,8 @@ static int mtd_erase_block(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug(ctx, "ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)",
-		  block_no, ret, err, util_get_error(err));
+	mtd_debug("ioctl=MEMERASE64, block=%d, ret=%d, err=%d (%s)", block_no,
+		  ret, err, util_get_error(err));
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
@@ -187,7 +177,7 @@ static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
 	int ret;
 
 	if (block_no < 0) {
-		mtd_debug(ctx, "block_no=%d", block_no);
+		mtd_debug("block_no=%d", block_no);
 		return YAFFS_FAIL;
 	}
 
@@ -196,7 +186,7 @@ static int mtd_mark_bad(struct yaffs_dev *dev, int block_no) {
 		err = util_get_errno();
 	}
 
-	mtd_debug(ctx, "ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
+	mtd_debug("ioctl=MEMSETBADBLOCK, block=%d, ret=%d, err=%d (%s)",
 		  block_no, ret, err, util_get_error(err));
 
 	if (ret < 0) {
@@ -244,8 +234,8 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 	int ret;
 
 	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		mtd_debug(ctx, "nand_chunk=%d, data_len=%d, oob_len=%d",
-			  nand_chunk, data_len, oob_len);
+		mtd_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
+			  data_len, oob_len);
 		return YAFFS_FAIL;
 	}
 
@@ -263,13 +253,12 @@ static int mtd_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 		err = util_get_errno();
 	}
 
-	mtd_debug(ctx,
-		  "ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
+	mtd_debug("ioctl=MEMREAD, chunk=%d, data=%p (%d), oob=%p (%d), ret=%d, "
 		  "err=%d (%s)",
 		  nand_chunk, data, data_len, oob, oob_len, ret, err,
 		  util_get_error(err));
-	mtd_debug_hexdump(ctx, data, data_len, "data");
-	mtd_debug_hexdump(ctx, oob, oob_len, "oob");
+	mtd_debug_hexdump(data, data_len, "data");
+	mtd_debug_hexdump(oob, oob_len, "oob");
 
 	ret = mtd_ecc_result(ret, &ecc_result);
 
@@ -295,8 +284,8 @@ static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 	int ret;
 
 	if (nand_chunk < 0 || data_len < 0 || oob_len < 0) {
-		mtd_debug(ctx, "nand_chunk=%d, data_len=%d, oob_len=%d",
-			  nand_chunk, data_len, oob_len);
+		mtd_debug("nand_chunk=%d, data_len=%d, oob_len=%d", nand_chunk,
+			  data_len, oob_len);
 		return YAFFS_FAIL;
 	}
 
@@ -314,13 +303,12 @@ static int mtd_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 		err = util_get_errno();
 	}
 
-	mtd_debug(ctx,
-		  "ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
+	mtd_debug("ioctl=MEMWRITE, chunk=%d, data=%p (%d), oob=%p (%d), "
 		  "ret=%d, err=%d (%s)",
 		  nand_chunk, data, data_len, oob, oob_len, ret, err,
 		  util_get_error(err));
-	mtd_debug_hexdump(ctx, data, data_len, "data");
-	mtd_debug_hexdump(ctx, oob, oob_len, "oob");
+	mtd_debug_hexdump(data, data_len, "data");
+	mtd_debug_hexdump(oob, oob_len, "oob");
 
 	if (ret < 0) {
 		return YAFFS_FAIL;
