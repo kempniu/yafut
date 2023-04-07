@@ -27,10 +27,9 @@
 #include "ydrv.h"
 
 /*
- * Structure passed around in the 'driver_context' field of struct yaffs_dev.
+ * Structure passed around while src/copy.c does its job.
  */
 struct mtd_ctx {
-	struct mtd_info_user mtd;
 	struct yaffs_dev *yaffs_dev;
 	const char *mtd_path;
 	int mtd_fd;
@@ -133,16 +132,16 @@ static int read_oobavail_from_sysfs(const char *mtd_path,
  * Given an MTD context 'ctx' with its 'mtd_fd' member containing an open file
  * descriptor for an MTD character device, use the MEMGETINFO ioctl and sysfs
  * attribute values to determine the parameters of the provided MTD and store
- * most of them in 'ctx->mtd'; store the number of available bytes in the OOB
- * area in 'oobavail_out' (this value does not need to be retained in
- * 'ctx->mtd' because it is only used during Yaffs device initialization).
+ * most of them in 'mtd'; store the number of available bytes in the OOB area
+ * in 'oobavail_out'.
  */
 static int discover_mtd_parameters(struct mtd_ctx *ctx,
+				   struct mtd_info_user *mtd,
 				   unsigned int *oobavail_out) {
 	unsigned int oobavail;
 	int ret;
 
-	ret = linux_ioctl(ctx->mtd_fd, MEMGETINFO, &ctx->mtd);
+	ret = linux_ioctl(ctx->mtd_fd, MEMGETINFO, mtd);
 	if (ret < 0) {
 		ret = util_get_errno();
 		log_error(ret, "unable to get MTD information");
@@ -160,9 +159,8 @@ static int discover_mtd_parameters(struct mtd_ctx *ctx,
 	mtd_debug(ctx,
 		  "type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
 		  "oobsize=%d, oobavail=%d",
-		  ctx->mtd.type, ctx->mtd.flags, ctx->mtd.size,
-		  ctx->mtd.erasesize, ctx->mtd.writesize, ctx->mtd.oobsize,
-		  oobavail);
+		  mtd->type, mtd->flags, mtd->size, mtd->erasesize,
+		  mtd->writesize, mtd->oobsize, oobavail);
 
 	return 0;
 }
@@ -170,9 +168,8 @@ static int discover_mtd_parameters(struct mtd_ctx *ctx,
 /*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
-static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
-			  bool force_inband_tags) {
-	const struct mtd_info_user *mtd = &ctx->mtd;
+static int init_yaffs_dev(struct mtd_ctx *ctx, struct mtd_info_user *mtd,
+			  unsigned int oobavail, bool force_inband_tags) {
 	int inband_tags;
 	int is_yaffs2;
 
@@ -214,11 +211,12 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, unsigned int oobavail,
 }
 
 /*
- * Retrieve MTD layout information using the ioctl() system call and store it
- * in the structure passed around in the 'driver_context' field of struct
- * yaffs_dev.  Then initialize Yaffs code for the MTD in question.
+ * Discover MTD parameters and initialize Yaffs code for the MTD in question.
+ * Save a pointer to a structure holding all the data that needs to be passed
+ * around while src/copy.c does its job in 'ctxp'.
  */
 static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
+	struct mtd_info_user mtd;
 	unsigned int oobavail;
 	struct mtd_ctx *ctx;
 	int flags;
@@ -239,19 +237,19 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_free_ctx;
 	}
 
-	ret = discover_mtd_parameters(ctx, &oobavail);
+	ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
 	if (ret < 0) {
 		goto err_close_mtd_fd;
 	}
 
-	ret = init_yaffs_dev(ctx, oobavail, opts->force_inband_tags);
+	ret = init_yaffs_dev(ctx, &mtd, oobavail, opts->force_inband_tags);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;
 	}
 
-	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, ctx->mtd.writesize,
-			ctx->mtd.erasesize);
+	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, mtd.writesize,
+			mtd.erasesize);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs driver");
 		goto err_free_yaffs_dev;
@@ -315,6 +313,8 @@ static int check_device_path(const char *device_path) {
 
 /*
  * Initialize the MTD at the given path and mount it for subsequent operations.
+ * Save a pointer to a structure holding all the data that needs to be passed
+ * around while src/copy.c does its job in 'ctxp'.
  */
 int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx = NULL;
