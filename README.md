@@ -92,11 +92,17 @@ options are:
 
   - Use of inband tags (`-T`).  Yafut assumes that inband tags are only
     necessary if the MTD does not have enough available bytes in the OOB
-    area to store a full Yaffs2 tag structure (including tags ECC data).
-    However, some file systems may use inband tags despite being stored
-    on an MTD that does have enough available space in the OOB area to
-    fit a full Yaffs2 tag structure.  For such file systems, the `-T`
-    command-line option can be used to force use of inband tags.
+    area to store a Yaffs2 tag structure (whether that includes ECC data
+    for tags or not depends on whether the `-E` option is used, see
+    below).  However, some file systems may use inband tags despite
+    being stored on an MTD that does have enough available space in the
+    OOB area to fit a Yaffs2 tag structure.  For such file systems, the
+    `-T` command-line option can be used to force use of inband tags.
+
+  - Use of ECC for tags (`-E`).  Yafut assumes that Yaffs2 tag
+    structures include ECC data for tags by default.  If a given file
+    system does not use ECC for tags, the `-E` command-line option can
+    be used to tell Yafut to act accordingly.
 
 ### Does this tool really only work with Linux kernel 6.1+?
 
