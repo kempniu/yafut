@@ -100,6 +100,22 @@ static void ydrv_debug_hexdump_location(const char *file, int line,
 }
 
 /*
+ * Get the offset at which data starts for the given Yaffs 'chunk' on the MTD
+ * described by 'ctx'.  This routine is more than a simple multiplication so
+ * that it can handle Yaffs layouts in which the block size is not a multiple
+ * of the chunk size (with padding between the last chunk in a block and the
+ * first chunk of the following block).
+ */
+static long long ydrv_get_data_offset_for_chunk(const struct ydrv_ctx *ctx,
+						int nand_chunk) {
+	unsigned int chunks_per_block = ctx->block_size / ctx->chunk_size;
+	unsigned int block = nand_chunk / chunks_per_block;
+	unsigned int chunk_in_block = nand_chunk % chunks_per_block;
+
+	return (block * ctx->block_size) + (chunk_in_block * ctx->chunk_size);
+}
+
+/*
  * Check whether the given MTD block is a bad one.
  *
  * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
@@ -224,7 +240,7 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int nand_chunk, u8 *data,
 			   int data_len, u8 *oob, int oob_len,
 			   enum yaffs_ecc_result *ecc_result_out) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	long long offset = nand_chunk * ctx->chunk_size;
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, nand_chunk);
 	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
@@ -275,7 +291,7 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int nand_chunk,
 			    const u8 *data, int data_len, const u8 *oob,
 			    int oob_len) {
 	const struct ydrv_ctx *ctx = dev->driver_context;
-	long long offset = nand_chunk * ctx->chunk_size;
+	long long offset = ydrv_get_data_offset_for_chunk(ctx, nand_chunk);
 	int err = 0;
 	int ret;
 
