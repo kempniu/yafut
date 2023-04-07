@@ -4,7 +4,9 @@
 
 #include <limits.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "log.h"
@@ -29,6 +31,48 @@ void options_parse_env(void) {
 	}
 
 	log_set_yaffs_trace_mask(mask);
+}
+
+/*
+ * Convert the provided 'string' to a signed integer value according to the
+ * given 'base', storing the result in 'result'.  If 'suffixes_allowed' is
+ * 'true', also handle an optional 'k' suffix (kilobytes).
+ */
+static int parse_int(const char *string, int base, bool suffixes_allowed,
+		     int *result) {
+	unsigned int multiplier = 1;
+	unsigned int value;
+	char copy[32];
+	int ret;
+
+	ret = snprintf(copy, sizeof(copy), "%s", string);
+	if (ret < 0 || (unsigned int)ret >= sizeof(copy)) {
+		log("'%s' is too long to parse as a number", string);
+		return -1;
+	}
+
+	if (suffixes_allowed) {
+		size_t len = strlen(copy);
+
+		if (copy[len - 1] == 'k') {
+			multiplier = 1024;
+			copy[len - 1] = '\0';
+		}
+	}
+
+	ret = util_parse_number(copy, base, &value);
+	if (ret < 0) {
+		return -1;
+	}
+
+	if (value > INT_MAX / multiplier) {
+		log("number '%s' is too large", string);
+		return -1;
+	}
+
+	*result = value * multiplier;
+
+	return 0;
 }
 
 /*
@@ -65,15 +109,8 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				log("-m can only be used once");
 				return -1;
 			}
-			{
-				unsigned int mode;
-
-				if (util_parse_number(optarg, 8, &mode) < 0
-				    || mode > INT_MAX) {
-					return -1;
-				}
-
-				opts->dst_mode = mode;
+			if (parse_int(optarg, 8, false, &opts->dst_mode) < 0) {
+				return -1;
 			}
 			break;
 		case 'o':
