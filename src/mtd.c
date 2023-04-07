@@ -191,13 +191,36 @@ static void init_yaffs_geometry(const struct mtd_ctx *ctx,
 }
 
 /*
+ * Return 'true' if inband tags should be used, taking into account the Yaffs
+ * file system version, the amount of available space in the OOB area of the
+ * MTD device, and the command-line options used; return 'false' otherwise.
+ */
+static bool use_inband_tags(bool is_yaffs2, unsigned int oobavail,
+			    const struct opts *opts) {
+	struct yaffs_packed_tags2 tags;
+
+	if (!is_yaffs2) {
+		return false;
+	}
+
+	if (opts->force_inband_tags) {
+		return true;
+	}
+
+	if (opts->disable_ecc_for_tags) {
+		return (oobavail < sizeof(tags.t));
+	}
+
+	return (oobavail < sizeof(tags));
+}
+
+/*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
 static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 			  unsigned int oobavail, unsigned int chunk_size,
-			  unsigned int block_size, bool force_inband_tags) {
-	int inband_tags;
-	int is_yaffs2;
+			  unsigned int block_size, const struct opts *opts) {
+	bool is_yaffs2;
 
 	ctx->yaffs_dev = calloc(1, sizeof(*ctx->yaffs_dev));
 	if (!ctx->yaffs_dev) {
@@ -205,9 +228,6 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 	}
 
 	is_yaffs2 = (chunk_size >= 1024);
-	inband_tags = (is_yaffs2
-		       && (oobavail < sizeof(struct yaffs_packed_tags2)
-			   || force_inband_tags));
 
 	*ctx->yaffs_dev = (struct yaffs_dev) {
 		.param = {
@@ -218,20 +238,23 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 			.end_block = (mtd->size / block_size) - 1,
 			.n_reserved_blocks = 2,
 			.is_yaffs2 = is_yaffs2,
-			.inband_tags = inband_tags,
+			.inband_tags = use_inband_tags(is_yaffs2, oobavail,
+						       opts),
+			.no_tags_ecc = opts->disable_ecc_for_tags,
 		},
 	};
 
 	mtd_debug(ctx,
 		  "total_bytes_per_chunk=%d, chunks_per_block=%d, "
 		  "spare_bytes_per_chunk=%d, end_block=%d, is_yaffs2=%d, "
-		  "inband_tags=%d",
+		  "inband_tags=%d, no_tags_ecc=%d",
 		  ctx->yaffs_dev->param.total_bytes_per_chunk,
 		  ctx->yaffs_dev->param.chunks_per_block,
 		  ctx->yaffs_dev->param.spare_bytes_per_chunk,
 		  ctx->yaffs_dev->param.end_block,
 		  ctx->yaffs_dev->param.is_yaffs2,
-		  ctx->yaffs_dev->param.inband_tags);
+		  ctx->yaffs_dev->param.inband_tags,
+		  ctx->yaffs_dev->param.no_tags_ecc);
 
 	return 0;
 }
@@ -272,8 +295,7 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 
 	init_yaffs_geometry(ctx, &mtd, opts, &chunk_size, &block_size);
 
-	ret = init_yaffs_dev(ctx, &mtd, oobavail, chunk_size, block_size,
-			     opts->force_inband_tags);
+	ret = init_yaffs_dev(ctx, &mtd, oobavail, chunk_size, block_size, opts);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;

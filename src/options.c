@@ -90,7 +90,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.block_size = SIZE_UNSPECIFIED,
 	};
 
-	while ((opt = getopt(argc, argv, "B:C:d:hi:m:o:rTvw")) != -1) {
+	while ((opt = getopt(argc, argv, "B:C:d:Ehi:m:o:rTvw")) != -1) {
 		switch (opt) {
 		case 'B':
 			if (opts->block_size != SIZE_UNSPECIFIED) {
@@ -118,6 +118,13 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				return -1;
 			}
 			opts->device_path = optarg;
+			break;
+		case 'E':
+			if (opts->disable_ecc_for_tags) {
+				log("-E can only be used once");
+				return -1;
+			}
+			opts->disable_ecc_for_tags = true;
 			break;
 		case 'i':
 			if (opts->src_path) {
