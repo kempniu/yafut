@@ -169,46 +169,44 @@ static int discover_mtd_parameters(const struct mtd_ctx *ctx,
 }
 
 /*
- * Determine the MTD type and the values to use for 'chunk_size' and
- * 'block_size':
- *
- *  1. Default to using autodetected MTD parameters provided in 'mtd'.
- *
- *  2. If NOR flash is detected, override chunk size and block size to the
- *     defaults used by Yaffs code when creating Yaffs2 file system images.
- *     (NOR flash not have a spare area and is byte-addressable, so the values
- *     stored in struct mtd_info_user by the MEMGETINFO ioctl cannot be used
- *     verbatim.)
- *
- *  3. If -C and/or -B were used, override any autodetected values with those
- *     provided on the command line.
- *
- * Set 'mtd_type' accordingly, so that the Yaffs driver knows which helper
- * functions to use for this specific MTD.
+ * Set 'chunk_size' and 'block_size' to the default values used by Yaffs code
+ * when creating Yaffs2 file system images.
  */
-static void
-init_yaffs_geometry(const struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
-		    const struct opts *opts, enum ydrv_mtd_type *mtd_type,
-		    unsigned int *chunk_size, unsigned int *block_size) {
+static void init_yaffs_geometry_default(const struct mtd_ctx *ctx,
+					unsigned int *chunk_size,
+					unsigned int *block_size) {
+	mtd_debug(ctx, "using default chunk size of %d bytes",
+		  DEFAULT_NOR_CHUNK_SIZE);
+	mtd_debug(ctx, "using default block size of %d bytes",
+		  DEFAULT_NOR_BLOCK_SIZE);
+	*chunk_size = DEFAULT_NOR_CHUNK_SIZE;
+	*block_size = DEFAULT_NOR_BLOCK_SIZE;
+}
+
+/*
+ * Set 'chunk_size' and 'block_size' to the relevant MTD parameters provided in
+ * 'mtd'.
+ */
+static void init_yaffs_geometry_autodetected(const struct mtd_ctx *ctx,
+					     const struct mtd_info_user *mtd,
+					     unsigned int *chunk_size,
+					     unsigned int *block_size) {
+	mtd_debug(ctx, "using autodetected chunk size of %d bytes",
+		  mtd->writesize);
+	mtd_debug(ctx, "using autodetected block size of %d bytes",
+		  mtd->erasesize);
 	*chunk_size = mtd->writesize;
 	*block_size = mtd->erasesize;
+}
 
-	if (mtd->oobsize == 0 && mtd->writesize == 1) {
-		mtd_debug(ctx, "NOR flash detected");
-		mtd_debug(ctx, "using default chunk size of %d bytes",
-			  DEFAULT_NOR_CHUNK_SIZE);
-		mtd_debug(ctx, "using default block size of %d bytes",
-			  DEFAULT_NOR_BLOCK_SIZE);
-
-		*mtd_type = MTD_TYPE_NOR;
-		*chunk_size = DEFAULT_NOR_CHUNK_SIZE;
-		*block_size = DEFAULT_NOR_BLOCK_SIZE;
-	} else {
-		mtd_debug(ctx, "NAND flash detected");
-
-		*mtd_type = MTD_TYPE_NAND;
-	}
-
+/*
+ * Set 'chunk_size' and 'block_size' to the values provided in command-line
+ * options -C and -B, respectively, if these options were used.
+ */
+static void override_yaffs_geometry_from_options(const struct mtd_ctx *ctx,
+						 const struct opts *opts,
+						 unsigned int *chunk_size,
+						 unsigned int *block_size) {
 	if (opts->chunk_size != SIZE_UNSPECIFIED) {
 		mtd_debug(ctx, "overriding chunk size to %d bytes",
 			  opts->chunk_size);
@@ -220,6 +218,43 @@ init_yaffs_geometry(const struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 			  opts->block_size);
 		*block_size = opts->block_size;
 	}
+}
+
+/*
+ * Determine the MTD type and the values to use for 'chunk_size' and
+ * 'block_size':
+ *
+ *  1. If NOR flash is detected, use default chunk size and block size values
+ *     used by Yaffs code when creating Yaffs2 file system images.  (NOR flash
+ *     does not have a spare area and is byte-addressable, so the values stored
+ *     in struct mtd_info_user by the MEMGETINFO ioctl cannot be used
+ *     verbatim.)
+ *
+ *     If NAND flash is detected, use autodetected MTD parameters provided in
+ *     'mtd'.
+ *
+ *  2. If -C and/or -B were used, override any default values with those
+ *     provided on the command line.
+ *
+ * Set 'mtd_type' accordingly, so that the Yaffs driver knows which helper
+ * functions to use for this specific MTD.
+ */
+static void
+init_yaffs_geometry(const struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
+		    const struct opts *opts, enum ydrv_mtd_type *mtd_type,
+		    unsigned int *chunk_size, unsigned int *block_size) {
+	if (mtd->oobsize == 0 && mtd->writesize == 1) {
+		mtd_debug(ctx, "NOR flash detected");
+		*mtd_type = MTD_TYPE_NOR;
+		init_yaffs_geometry_default(ctx, chunk_size, block_size);
+	} else {
+		mtd_debug(ctx, "NAND flash detected");
+		*mtd_type = MTD_TYPE_NAND;
+		init_yaffs_geometry_autodetected(ctx, mtd, chunk_size,
+						 block_size);
+	}
+
+	override_yaffs_geometry_from_options(ctx, opts, chunk_size, block_size);
 }
 
 /*
