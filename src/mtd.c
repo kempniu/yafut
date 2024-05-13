@@ -240,6 +240,30 @@ override_yaffs_geometry_from_options(const struct mtd_ctx *ctx,
 }
 
 /*
+ * Determine the Yaffs geometry to use for the provided regular file, based on
+ * its size and the provided command-line options.
+ */
+static int init_yaffs_geometry_file(const struct mtd_ctx *ctx,
+				    const struct opts *opts,
+				    struct mtd_geometry *geometry) {
+	struct stat statbuf;
+	int ret;
+
+	ret = fstat(ctx->mtd_fd, &statbuf);
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "unable to fstat() '%s'", ctx->mtd_path);
+		return ret;
+	}
+
+	init_yaffs_geometry_default(ctx, geometry, MTD_TYPE_FILE);
+	override_yaffs_geometry_from_options(ctx, opts, geometry);
+	geometry->block_count = statbuf.st_size / geometry->block_size;
+
+	return 0;
+}
+
+/*
  * Determine the type of flash memory represented by the provided MTD character
  * device.  Based on that information and the provided command-line options,
  * determine the Yaffs geometry to use:
@@ -275,26 +299,37 @@ static void init_yaffs_geometry_nand_or_nor(const struct mtd_ctx *ctx,
 }
 
 /*
- * Determine the type of the provided MTD (which can be either NAND or NOR
- * flash) and the Yaffs geometry to use.  Store all the information gathered in
- * 'geometry'.
+ * Determine the type of the provided MTD (which can be either NAND/NOR flash
+ * or a regular file) and the Yaffs geometry to use.  Store all the information
+ * gathered in 'geometry'.
  */
 static int init_yaffs_geometry(const struct mtd_ctx *ctx,
-			       const struct opts *opts,
+			       const struct opts *opts, bool mtd_is_a_file,
 			       struct mtd_geometry *geometry) {
-	struct mtd_info_user mtd;
-	unsigned int oobavail;
 	int ret;
 
-	ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
-	if (ret < 0) {
-		return ret;
+	if (mtd_is_a_file) {
+		ret = init_yaffs_geometry_file(ctx, opts, geometry);
+		if (ret < 0) {
+			return ret;
+		}
+
+		geometry->oob_size = 0;
+		geometry->oobavail = 0;
+	} else {
+		struct mtd_info_user mtd;
+		unsigned int oobavail;
+
+		ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
+		if (ret < 0) {
+			return ret;
+		}
+
+		init_yaffs_geometry_nand_or_nor(ctx, &mtd, opts, geometry);
+
+		geometry->oob_size = mtd.oobsize;
+		geometry->oobavail = oobavail;
 	}
-
-	init_yaffs_geometry_nand_or_nor(ctx, &mtd, opts, geometry);
-
-	geometry->oob_size = mtd.oobsize;
-	geometry->oobavail = oobavail;
 
 	return 0;
 }
@@ -375,7 +410,8 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
  * Save a pointer to a structure holding all the data that needs to be passed
  * around while src/copy.c does its job in 'ctxp'.
  */
-static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
+static int init_mtd_context(const struct opts *opts, bool mtd_is_a_file,
+			    struct mtd_ctx **ctxp) {
 	struct mtd_geometry geometry;
 	struct mtd_ctx *ctx;
 	int flags;
@@ -392,11 +428,11 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 	ctx->mtd_fd = open(opts->device_path, flags);
 	if (ctx->mtd_fd < 0) {
 		ret = util_get_errno();
-		log_error(ret, "unable to open MTD character device");
+		log_error(ret, "unable to open '%s'", ctx->mtd_path);
 		goto err_free_ctx;
 	}
 
-	ret = init_yaffs_geometry(ctx, opts, &geometry);
+	ret = init_yaffs_geometry(ctx, opts, mtd_is_a_file, &geometry);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs geometry");
 		goto err_close_mtd_fd;
@@ -448,10 +484,12 @@ static void destroy_mtd_context(struct mtd_ctx **ctxp) {
 
 /*
  * Ensure that the device path provided via the -d command-line option points
- * to an accessible character device (which is expected for MTD devices).
- * Basic sanity check.
+ * to an accessible character device (which is expected for MTD devices) or a
+ * regular file.  Set 'mtd_is_a_file' to 'true' if 'device_path' points to a
+ * regular file; set it to 'false' if it points to a character device; return
+ * an error otherwise.
  */
-static int check_device_path(const char *device_path) {
+static int check_device_path(const char *device_path, bool *mtd_is_a_file) {
 	struct stat statbuf;
 	int ret;
 
@@ -462,9 +500,17 @@ static int check_device_path(const char *device_path) {
 		return ret;
 	}
 
-	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
+	switch (statbuf.st_mode & S_IFMT) {
+	case S_IFREG:
+		*mtd_is_a_file = true;
+		break;
+	case S_IFCHR:
+		*mtd_is_a_file = false;
+		break;
+	default:
 		ret = -ENODEV;
-		log_error(ret, "'%s' is not a character device", device_path);
+		log_error(ret, "'%s' is neither a character device nor a file",
+			  device_path);
 		return ret;
 	}
 
@@ -478,14 +524,15 @@ static int check_device_path(const char *device_path) {
  */
 int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx = NULL;
+	bool mtd_is_a_file;
 	int ret;
 
-	ret = check_device_path(opts->device_path);
+	ret = check_device_path(opts->device_path, &mtd_is_a_file);
 	if (ret < 0) {
 		return ret;
 	}
 
-	ret = init_mtd_context(opts, &ctx);
+	ret = init_mtd_context(opts, mtd_is_a_file, &ctx);
 	if (ret < 0 || !ctx) {
 		return ret;
 	}
