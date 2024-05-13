@@ -157,6 +157,9 @@ static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 	case MTD_TYPE_NAND:
 	case MTD_TYPE_NOR:
 		return ydrv_check_bad_nand_or_nor(ctx, block_no);
+	case MTD_TYPE_FILE:
+		ydrv_debug("file is assumed to only contain good blocks");
+		return YAFFS_OK;
 	default:
 		log("unknown MTD type %d", ctx->mtd_type);
 		return YAFFS_FAIL;
@@ -195,6 +198,42 @@ static int ydrv_erase_block_nand_or_nor(const struct ydrv_ctx *ctx,
 }
 
 /*
+ * Erase the given MTD block in a file.
+ */
+static int ydrv_erase_block_file(const struct ydrv_ctx *ctx, int block_no) {
+	long long offset = block_no * ctx->block_size;
+	int err = 0;
+	int ret;
+
+	u8 *erased = calloc(1, ctx->block_size);
+	if (!erased) {
+		ydrv_debug("failed to allocate memory for erasure markers");
+		return YAFFS_FAIL;
+	}
+
+	memset(erased, 0xff, ctx->block_size);
+
+	ret = pwrite(ctx->mtd_fd, erased, ctx->block_size, offset);
+	if (ret < 0) {
+		err = util_get_errno();
+	}
+
+	ydrv_debug("pwrite, block_no=%d, offset=%lld (0x%08llx), data=%p (%d), "
+		   "ret=%d, err=%d (%s)",
+		   block_no, offset, offset, erased, ctx->block_size, ret, err,
+		   util_get_error(err));
+	ydrv_debug_hexdump(erased, ctx->block_size, "data");
+
+	free(erased);
+
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
+}
+
+/*
  * Erase the given MTD block.
  *
  * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
@@ -211,6 +250,8 @@ static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
 	case MTD_TYPE_NAND:
 	case MTD_TYPE_NOR:
 		return ydrv_erase_block_nand_or_nor(ctx, block_no);
+	case MTD_TYPE_FILE:
+		return ydrv_erase_block_file(ctx, block_no);
 	default:
 		log("unknown MTD type %d", ctx->mtd_type);
 		return YAFFS_FAIL;
@@ -258,6 +299,9 @@ static int ydrv_mark_bad(struct yaffs_dev *dev, int block_no) {
 	case MTD_TYPE_NAND:
 	case MTD_TYPE_NOR:
 		return ydrv_mark_bad_nand_or_nor(ctx, block_no);
+	case MTD_TYPE_FILE:
+		ydrv_debug("file is assumed to only contain good blocks");
+		return YAFFS_FAIL;
 	default:
 		log("unknown MTD type %d", ctx->mtd_type);
 		return YAFFS_FAIL;
@@ -331,9 +375,9 @@ static int ydrv_read_chunk_nand(const struct ydrv_ctx *ctx, int chunk, u8 *data,
 /*
  * Read a data chunk from NOR flash.
  */
-static int ydrv_read_chunk_nor(const struct ydrv_ctx *ctx, int chunk, u8 *data,
-			       int data_len,
-			       enum yaffs_ecc_result *ecc_result_out) {
+static int ydrv_read_chunk_nor_or_file(const struct ydrv_ctx *ctx, int chunk,
+				       u8 *data, int data_len,
+				       enum yaffs_ecc_result *ecc_result_out) {
 	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
 	enum yaffs_ecc_result ecc_result;
 	int err = 0;
@@ -381,8 +425,9 @@ static int ydrv_read_chunk(struct yaffs_dev *dev, int chunk, u8 *data,
 					    oob_len, ecc_result_out,
 					    dev->param.is_yaffs2);
 	case MTD_TYPE_NOR:
-		return ydrv_read_chunk_nor(ctx, chunk, data, data_len,
-					   ecc_result_out);
+	case MTD_TYPE_FILE:
+		return ydrv_read_chunk_nor_or_file(ctx, chunk, data, data_len,
+						   ecc_result_out);
 
 	default:
 		log("unknown MTD type %d", ctx->mtd_type);
@@ -431,8 +476,8 @@ static int ydrv_write_chunk_nand(const struct ydrv_ctx *ctx, int chunk,
 /*
  * Write a data chunk to NOR flash.
  */
-static int ydrv_write_chunk_nor(const struct ydrv_ctx *ctx, int chunk,
-				const u8 *data, int data_len) {
+static int ydrv_write_chunk_nor_or_file(const struct ydrv_ctx *ctx, int chunk,
+					const u8 *data, int data_len) {
 	long long offset = ydrv_get_data_offset_for_chunk(ctx, chunk);
 	int err = 0;
 	int ret;
@@ -475,7 +520,8 @@ static int ydrv_write_chunk(struct yaffs_dev *dev, int chunk, const u8 *data,
 		return ydrv_write_chunk_nand(ctx, chunk, data, data_len, oob,
 					     oob_len, dev->param.is_yaffs2);
 	case MTD_TYPE_NOR:
-		return ydrv_write_chunk_nor(ctx, chunk, data, data_len);
+	case MTD_TYPE_FILE:
+		return ydrv_write_chunk_nor_or_file(ctx, chunk, data, data_len);
 	default:
 		log("unknown MTD type %d", ctx->mtd_type);
 		return YAFFS_FAIL;
