@@ -164,20 +164,13 @@ static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 }
 
 /*
- * Erase the given MTD block.
- *
- * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
+ * Erase the given MTD block on NAND or NOR flash.
  */
-static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
-	const struct ydrv_ctx *ctx = dev->driver_context;
+static int ydrv_erase_block_nand_or_nor(const struct ydrv_ctx *ctx,
+					int block_no) {
 	long long offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
-
-	if (block_no < 0) {
-		ydrv_debug("block_no=%d", block_no);
-		return YAFFS_FAIL;
-	}
 
 	struct erase_info_user64 einfo64 = {
 		.start = offset,
@@ -199,6 +192,29 @@ static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
 	}
 
 	return YAFFS_OK;
+}
+
+/*
+ * Erase the given MTD block.
+ *
+ * (This is the 'drv_erase_fn' callback of struct yaffs_driver.)
+ */
+static int ydrv_erase_block(struct yaffs_dev *dev, int block_no) {
+	const struct ydrv_ctx *ctx = dev->driver_context;
+
+	if (block_no < 0) {
+		ydrv_debug("block_no=%d", block_no);
+		return YAFFS_FAIL;
+	}
+
+	switch (ctx->mtd_type) {
+	case MTD_TYPE_NAND:
+	case MTD_TYPE_NOR:
+		return ydrv_erase_block_nand_or_nor(ctx, block_no);
+	default:
+		log("unknown MTD type %d", ctx->mtd_type);
+		return YAFFS_FAIL;
+	}
 }
 
 /*
