@@ -107,6 +107,13 @@ options are:
     system does not use ECC for tags, the `-E` command-line option can
     be used to tell Yafut to act accordingly.
 
+  - Use of Yaffs2 checkpoints (`-P` to disable).  By default, Yaffs2
+    code stores a snapshot of its runtime state (called a "checkpoint")
+    in the file system when the latter gets unmounted or `sync()`'d.
+    Using these checkpoints speeds up file system mounting, but occupies
+    extra storage space.  If desired, reading and writing checkpoints
+    can be disabled using the `-P` command-line option.
+
 ### Which Yaffs file system versions does this tool work with?
 
 Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
