@@ -6,6 +6,7 @@ name: Source code checks
 on:
   pull_request:
     paths:
+      - '.github/workflows/code.yml'
       - 'src/**'
   push:
     branches:
