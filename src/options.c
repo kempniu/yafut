@@ -88,9 +88,10 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.dst_mode = FILE_MODE_UNSPECIFIED,
 		.chunk_size = SIZE_UNSPECIFIED,
 		.block_size = SIZE_UNSPECIFIED,
+		.byte_order = BYTE_ORDER_CPU,
 	};
 
-	while ((opt = getopt(argc, argv, "B:C:d:Ehi:m:o:PrSTvw")) != -1) {
+	while ((opt = getopt(argc, argv, "B:C:d:Ehi:LMm:o:PrSTvw")) != -1) {
 		switch (opt) {
 		case 'B':
 			if (opts->block_size != SIZE_UNSPECIFIED) {
@@ -132,6 +133,20 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				return -1;
 			}
 			opts->src_path = optarg;
+			break;
+		case 'L':
+			if (opts->byte_order != BYTE_ORDER_CPU) {
+				log("-L/-M can only be used once");
+				return -1;
+			}
+			opts->byte_order = BYTE_ORDER_LITTLE_ENDIAN;
+			break;
+		case 'M':
+			if (opts->byte_order != BYTE_ORDER_CPU) {
+				log("-L/-M can only be used once");
+				return -1;
+			}
+			opts->byte_order = BYTE_ORDER_BIG_ENDIAN;
 			break;
 		case 'm':
 			if (opts->dst_mode != FILE_MODE_UNSPECIFIED) {

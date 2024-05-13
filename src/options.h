@@ -19,6 +19,8 @@
 	"[ -E ] "                                                              \
 	"[ -P ] "                                                              \
 	"[ -S ] "                                                              \
+	"[ -L ] "                                                              \
+	"[ -M ] "                                                              \
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
@@ -35,6 +37,8 @@
 	"    -E  disable ECC for tags\n"                                       \
 	"    -P  disable Yaffs2 checkpoints\n"                                 \
 	"    -S  disable writing Yaffs2 summaries\n"                           \
+	"    -L  force little-endian byte order\n"                             \
+	"    -M  force big-endian byte order\n"                                \
 	"    -v  verbose output (can be used up to two times)\n"               \
 	"    -h  show usage information and exit\n"
 
@@ -42,6 +46,12 @@ enum program_mode {
 	PROGRAM_MODE_UNSPECIFIED,
 	PROGRAM_MODE_READ,
 	PROGRAM_MODE_WRITE,
+};
+
+enum byte_order {
+	BYTE_ORDER_CPU = 0,
+	BYTE_ORDER_LITTLE_ENDIAN = 1,
+	BYTE_ORDER_BIG_ENDIAN = 2,
 };
 
 #define FILE_MODE_UNSPECIFIED -1
@@ -59,6 +69,7 @@ struct opts {
 	bool disable_ecc_for_tags;
 	bool disable_checkpoints;
 	bool disable_summaries;
+	enum byte_order byte_order;
 };
 
 void options_parse_env(void);

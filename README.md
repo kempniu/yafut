@@ -120,6 +120,12 @@ options are:
     storage space.  If desired, writing summaries can be disabled using
     the `-S` command-line option.
 
+  - Byte order (`-L` to force little-endian byte order, `-M` to force
+    big-endian byte order).  By default, Yafut assumes that the byte
+    order used on the MTD is the same as the byte order used by the host
+    CPU.  This can be overridden if necessary, allowing little-endian
+    hosts to operate on big-endian file systems and vice versa.
+
 ### Which Yaffs file system versions does this tool work with?
 
 Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
