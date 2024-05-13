@@ -16,7 +16,8 @@ that employs [Yaffs Direct Interface (YDI)][YDI] and Linux [Memory
 Technology Devices (MTD)][MTD] ioctls to interact with Yaffs file
 systems from userspace.  It enables copying files from/to Yaffs file
 systems even if the kernel does not have native support for the Yaffs
-file system compiled in.
+file system compiled in.  Yafut also has limited support for copying
+files from/to Yaffs file system images stored in regular files.
 
 ## Requirements
 
@@ -155,6 +156,17 @@ No.  Here is why:
     the NAND device in raw mode (i.e. without using the Linux kernel's
     autoplacement mechanism for writing to the OOB area) and the concept
     of customizing the OOB layout does not really apply for Yaffs1.
+
+### Is this tool also able to work with Yaffs image files?
+
+Yes, to an extent.  The argument passed via the `-d` command-line option
+can be a path to either an MTD character device representing NAND/NOR
+flash memory or a regular file containing a Yaffs file system image.
+However, there is currently no support for working with file system
+images that include OOB data (e.g. NAND flash dumps).  Like for NOR
+flash, the Yaffs layout used for a given file system image can be fairly
+arbitrary and therefore Yaffs parameters for such a file system will
+likely need to be provided manually (see above).
 
 ## Troubleshooting & Debugging
 

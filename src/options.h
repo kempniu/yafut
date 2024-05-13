@@ -8,7 +8,7 @@
 
 #define USAGE_MSG                                                              \
 	"Usage: %s "                                                           \
-	"-d /dev/mtdX "                                                        \
+	"-d { /dev/mtdX | /path/to/yaffs.img } "                               \
 	"{ -r | -w } "                                                         \
 	"-i <src> "                                                            \
 	"-o <dst> "                                                            \
@@ -20,7 +20,7 @@
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
-	"    -d  path to the MTD character device to read from or write to\n"  \
+	"    -d  path to the MTD character device (or Yaffs image) to use\n"   \
 	"    -r  read a file from the MTD into a local file\n"                 \
 	"    -w  write a local file to a file on the MTD\n"                    \
 	"    -i  path to the source file (use '-' to read from stdin)\n"       \

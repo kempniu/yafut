@@ -38,6 +38,18 @@ struct mtd_ctx {
 	int mtd_fd;
 };
 
+/*
+ * Structure holding Yaffs filesystem geometry information.
+ */
+struct mtd_geometry {
+	enum ydrv_mtd_type mtd_type;
+	unsigned int chunk_size;
+	unsigned int block_count;
+	unsigned int block_size;
+	unsigned int oob_size;
+	unsigned int oobavail;
+};
+
 #define mtd_debug(ctx, fmt, ...)                                               \
 	mtd_debug_location(__FILE__, __LINE__, __func__, ctx, fmt,             \
 			   ##__VA_ARGS__)
@@ -169,57 +181,157 @@ static int discover_mtd_parameters(const struct mtd_ctx *ctx,
 }
 
 /*
- * Determine the MTD type and the values to use for 'chunk_size' and
- * 'block_size':
- *
- *  1. Default to using autodetected MTD parameters provided in 'mtd'.
- *
- *  2. If NOR flash is detected, override chunk size and block size to the
- *     defaults used by Yaffs code when creating Yaffs2 file system images.
- *     (NOR flash not have a spare area and is byte-addressable, so the values
- *     stored in struct mtd_info_user by the MEMGETINFO ioctl cannot be used
- *     verbatim.)
- *
- *  3. If -C and/or -B were used, override any autodetected values with those
- *     provided on the command line.
- *
- * Set 'mtd_type' accordingly, so that the Yaffs driver knows which helper
- * functions to use for this specific MTD.
+ * Initialize 'geometry' with 'chunk_size' and 'block_size' set to the default
+ * values used by Yaffs code when creating Yaffs2 file system images and
+ * 'mtd_type' set to the provided value.
+ */
+static void init_yaffs_geometry_default(const struct mtd_ctx *ctx,
+					struct mtd_geometry *geometry,
+					enum ydrv_mtd_type mtd_type) {
+	mtd_debug(ctx, "using default chunk size of %d bytes",
+		  DEFAULT_NOR_CHUNK_SIZE);
+	mtd_debug(ctx, "using default block size of %d bytes",
+		  DEFAULT_NOR_BLOCK_SIZE);
+	*geometry = (struct mtd_geometry){
+		.mtd_type = mtd_type,
+		.chunk_size = DEFAULT_NOR_CHUNK_SIZE,
+		.block_size = DEFAULT_NOR_BLOCK_SIZE,
+	};
+}
+
+/*
+ * Initialize 'geometry' with 'chunk_size' and 'block_size' set to the relevant
+ * MTD parameters provided in 'mtd' and 'mtd_type' set to the provided value.
+ */
+static void init_yaffs_geometry_autodetected(const struct mtd_ctx *ctx,
+					     const struct mtd_info_user *mtd,
+					     struct mtd_geometry *geometry,
+					     enum ydrv_mtd_type mtd_type) {
+	mtd_debug(ctx, "using autodetected chunk size of %d bytes",
+		  mtd->writesize);
+	mtd_debug(ctx, "using autodetected block size of %d bytes",
+		  mtd->erasesize);
+	*geometry = (struct mtd_geometry){
+		.mtd_type = mtd_type,
+		.chunk_size = mtd->writesize,
+		.block_size = mtd->erasesize,
+	};
+}
+
+/*
+ * Update 'chunk_size' and 'block_size' in 'geometry' to the values provided in
+ * command-line options -C and -B, respectively, if these options were used.
  */
 static void
-init_yaffs_geometry(const struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
-		    const struct opts *opts, enum ydrv_mtd_type *mtd_type,
-		    unsigned int *chunk_size, unsigned int *block_size) {
-	*chunk_size = mtd->writesize;
-	*block_size = mtd->erasesize;
-
-	if (mtd->oobsize == 0 && mtd->writesize == 1) {
-		mtd_debug(ctx, "NOR flash detected");
-		mtd_debug(ctx, "using default chunk size of %d bytes",
-			  DEFAULT_NOR_CHUNK_SIZE);
-		mtd_debug(ctx, "using default block size of %d bytes",
-			  DEFAULT_NOR_BLOCK_SIZE);
-
-		*mtd_type = MTD_TYPE_NOR;
-		*chunk_size = DEFAULT_NOR_CHUNK_SIZE;
-		*block_size = DEFAULT_NOR_BLOCK_SIZE;
-	} else {
-		mtd_debug(ctx, "NAND flash detected");
-
-		*mtd_type = MTD_TYPE_NAND;
-	}
-
+override_yaffs_geometry_from_options(const struct mtd_ctx *ctx,
+				     const struct opts *opts,
+				     struct mtd_geometry *geometry) {
 	if (opts->chunk_size != SIZE_UNSPECIFIED) {
 		mtd_debug(ctx, "overriding chunk size to %d bytes",
 			  opts->chunk_size);
-		*chunk_size = opts->chunk_size;
+		geometry->chunk_size = opts->chunk_size;
 	}
 
 	if (opts->block_size != SIZE_UNSPECIFIED) {
 		mtd_debug(ctx, "overriding block size to %d bytes",
 			  opts->block_size);
-		*block_size = opts->block_size;
+		geometry->block_size = opts->block_size;
 	}
+}
+
+/*
+ * Determine the Yaffs geometry to use for the provided regular file, based on
+ * its size and the provided command-line options.
+ */
+static int init_yaffs_geometry_file(const struct mtd_ctx *ctx,
+				    const struct opts *opts,
+				    struct mtd_geometry *geometry) {
+	struct stat statbuf;
+	int ret;
+
+	ret = fstat(ctx->mtd_fd, &statbuf);
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "unable to fstat() '%s'", ctx->mtd_path);
+		return ret;
+	}
+
+	init_yaffs_geometry_default(ctx, geometry, MTD_TYPE_FILE);
+	override_yaffs_geometry_from_options(ctx, opts, geometry);
+	geometry->block_count = statbuf.st_size / geometry->block_size;
+
+	return 0;
+}
+
+/*
+ * Determine the type of flash memory represented by the provided MTD character
+ * device.  Based on that information and the provided command-line options,
+ * determine the Yaffs geometry to use:
+ *
+ *  1. If NOR flash is detected, use default chunk size and block size values
+ *     used by Yaffs code when creating Yaffs2 file system images.  (NOR flash
+ *     does not have a spare area and is byte-addressable, so the values stored
+ *     in struct mtd_info_user by the MEMGETINFO ioctl cannot be used
+ *     verbatim.)
+ *
+ *     If NAND flash is detected, use autodetected MTD parameters provided in
+ *     'mtd'.
+ *
+ *  2. If -C and/or -B were used, override any default values with those
+ *     provided on the command line.
+ */
+static void init_yaffs_geometry_nand_or_nor(const struct mtd_ctx *ctx,
+					    const struct mtd_info_user *mtd,
+					    const struct opts *opts,
+					    struct mtd_geometry *geometry) {
+	if (mtd->oobsize == 0 && mtd->writesize == 1) {
+		mtd_debug(ctx, "NOR flash detected");
+		init_yaffs_geometry_default(ctx, geometry, MTD_TYPE_NOR);
+	} else {
+		mtd_debug(ctx, "NAND flash detected");
+		init_yaffs_geometry_autodetected(ctx, mtd, geometry,
+						 MTD_TYPE_NAND);
+	}
+
+	override_yaffs_geometry_from_options(ctx, opts, geometry);
+
+	geometry->block_count = mtd->size / geometry->block_size;
+}
+
+/*
+ * Determine the type of the provided MTD (which can be either NAND/NOR flash
+ * or a regular file) and the Yaffs geometry to use.  Store all the information
+ * gathered in 'geometry'.
+ */
+static int init_yaffs_geometry(const struct mtd_ctx *ctx,
+			       const struct opts *opts, bool mtd_is_a_file,
+			       struct mtd_geometry *geometry) {
+	int ret;
+
+	if (mtd_is_a_file) {
+		ret = init_yaffs_geometry_file(ctx, opts, geometry);
+		if (ret < 0) {
+			return ret;
+		}
+
+		geometry->oob_size = 0;
+		geometry->oobavail = 0;
+	} else {
+		struct mtd_info_user mtd;
+		unsigned int oobavail;
+
+		ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
+		if (ret < 0) {
+			return ret;
+		}
+
+		init_yaffs_geometry_nand_or_nor(ctx, &mtd, opts, geometry);
+
+		geometry->oob_size = mtd.oobsize;
+		geometry->oobavail = oobavail;
+	}
+
+	return 0;
 }
 
 /*
@@ -249,9 +361,9 @@ static bool use_inband_tags(bool is_yaffs2, unsigned int oobavail,
 /*
  * Initialize the structure used by Yaffs code to interact with the given MTD.
  */
-static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
-			  unsigned int oobavail, unsigned int chunk_size,
-			  unsigned int block_size, const struct opts *opts) {
+static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
+			  const struct mtd_geometry *geometry) {
+	unsigned int chunks_per_block;
 	bool is_yaffs2;
 
 	ctx->yaffs_dev = calloc(1, sizeof(*ctx->yaffs_dev));
@@ -259,18 +371,20 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
 		return -ENOMEM;
 	}
 
-	is_yaffs2 = (chunk_size >= 1024);
+	chunks_per_block = geometry->block_size / geometry->chunk_size;
+	is_yaffs2 = (geometry->chunk_size >= 1024);
 
 	*ctx->yaffs_dev = (struct yaffs_dev) {
 		.param = {
-			.total_bytes_per_chunk = chunk_size,
-			.chunks_per_block = block_size / chunk_size,
-			.spare_bytes_per_chunk = mtd->oobsize,
+			.total_bytes_per_chunk = geometry->chunk_size,
+			.chunks_per_block = chunks_per_block,
+			.spare_bytes_per_chunk = geometry->oob_size,
 			.start_block = 0,
-			.end_block = (mtd->size / block_size) - 1,
+			.end_block = geometry->block_count - 1,
 			.n_reserved_blocks = 2,
 			.is_yaffs2 = is_yaffs2,
-			.inband_tags = use_inband_tags(is_yaffs2, oobavail,
+			.inband_tags = use_inband_tags(is_yaffs2,
+						       geometry->oobavail,
 						       opts),
 			.no_tags_ecc = opts->disable_ecc_for_tags,
 		},
@@ -296,12 +410,9 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct mtd_info_user *mtd,
  * Save a pointer to a structure holding all the data that needs to be passed
  * around while src/copy.c does its job in 'ctxp'.
  */
-static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
-	enum ydrv_mtd_type mtd_type;
-	struct mtd_info_user mtd;
-	unsigned int chunk_size;
-	unsigned int block_size;
-	unsigned int oobavail;
+static int init_mtd_context(const struct opts *opts, bool mtd_is_a_file,
+			    struct mtd_ctx **ctxp) {
+	struct mtd_geometry geometry;
 	struct mtd_ctx *ctx;
 	int flags;
 	int ret;
@@ -317,26 +428,24 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 	ctx->mtd_fd = open(opts->device_path, flags);
 	if (ctx->mtd_fd < 0) {
 		ret = util_get_errno();
-		log_error(ret, "unable to open MTD character device");
+		log_error(ret, "unable to open '%s'", ctx->mtd_path);
 		goto err_free_ctx;
 	}
 
-	ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
+	ret = init_yaffs_geometry(ctx, opts, mtd_is_a_file, &geometry);
 	if (ret < 0) {
+		log_error(ret, "unable to initialize Yaffs geometry");
 		goto err_close_mtd_fd;
 	}
 
-	init_yaffs_geometry(ctx, &mtd, opts, &mtd_type, &chunk_size,
-			    &block_size);
-
-	ret = init_yaffs_dev(ctx, &mtd, oobavail, chunk_size, block_size, opts);
+	ret = init_yaffs_dev(ctx, opts, &geometry);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs device");
 		goto err_close_mtd_fd;
 	}
 
-	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, mtd_type, chunk_size,
-			block_size);
+	ret = ydrv_init(ctx->yaffs_dev, ctx->mtd_fd, geometry.mtd_type,
+			geometry.chunk_size, geometry.block_size);
 	if (ret < 0) {
 		log_error(ret, "unable to initialize Yaffs driver");
 		goto err_free_yaffs_dev;
@@ -375,10 +484,12 @@ static void destroy_mtd_context(struct mtd_ctx **ctxp) {
 
 /*
  * Ensure that the device path provided via the -d command-line option points
- * to an accessible character device (which is expected for MTD devices).
- * Basic sanity check.
+ * to an accessible character device (which is expected for MTD devices) or a
+ * regular file.  Set 'mtd_is_a_file' to 'true' if 'device_path' points to a
+ * regular file; set it to 'false' if it points to a character device; return
+ * an error otherwise.
  */
-static int check_device_path(const char *device_path) {
+static int check_device_path(const char *device_path, bool *mtd_is_a_file) {
 	struct stat statbuf;
 	int ret;
 
@@ -389,9 +500,17 @@ static int check_device_path(const char *device_path) {
 		return ret;
 	}
 
-	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
+	switch (statbuf.st_mode & S_IFMT) {
+	case S_IFREG:
+		*mtd_is_a_file = true;
+		break;
+	case S_IFCHR:
+		*mtd_is_a_file = false;
+		break;
+	default:
 		ret = -ENODEV;
-		log_error(ret, "'%s' is not a character device", device_path);
+		log_error(ret, "'%s' is neither a character device nor a file",
+			  device_path);
 		return ret;
 	}
 
@@ -405,14 +524,15 @@ static int check_device_path(const char *device_path) {
  */
 int mtd_mount(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_ctx *ctx = NULL;
+	bool mtd_is_a_file;
 	int ret;
 
-	ret = check_device_path(opts->device_path);
+	ret = check_device_path(opts->device_path, &mtd_is_a_file);
 	if (ret < 0) {
 		return ret;
 	}
 
-	ret = init_mtd_context(opts, &ctx);
+	ret = init_mtd_context(opts, mtd_is_a_file, &ctx);
 	if (ret < 0 || !ctx) {
 		return ret;
 	}

@@ -7,6 +7,7 @@
 enum ydrv_mtd_type {
 	MTD_TYPE_NAND,
 	MTD_TYPE_NOR,
+	MTD_TYPE_FILE,
 };
 
 int ydrv_init(struct yaffs_dev *yaffs_dev, int mtd_fd,
