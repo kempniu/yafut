@@ -114,6 +114,12 @@ options are:
     extra storage space.  If desired, reading and writing checkpoints
     can be disabled using the `-P` command-line option.
 
+  - Writing Yaffs2 summaries (`-S` to disable).  By default, Yaffs2
+    code stores a so-called summary at the end of each block.  Using
+    these summaries speeds up file system scanning, but occupies extra
+    storage space.  If desired, writing summaries can be disabled using
+    the `-S` command-line option.
+
 ### Which Yaffs file system versions does this tool work with?
 
 Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file

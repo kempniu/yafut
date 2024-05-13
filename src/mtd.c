@@ -389,6 +389,7 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
 			.no_tags_ecc = opts->disable_ecc_for_tags,
 			.skip_checkpt_rd = opts->disable_checkpoints,
 			.skip_checkpt_wr = opts->disable_checkpoints,
+			.disable_summary = opts->disable_summaries,
 		},
 	};
 
@@ -396,7 +397,7 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
 		  "total_bytes_per_chunk=%d, chunks_per_block=%d, "
 		  "spare_bytes_per_chunk=%d, end_block=%d, is_yaffs2=%d, "
 		  "inband_tags=%d, no_tags_ecc=%d, skip_checkpt_rd=%d, "
-		  "skip_checkpt_wr=%d",
+		  "skip_checkpt_wr=%d, disable_summary=%d",
 		  ctx->yaffs_dev->param.total_bytes_per_chunk,
 		  ctx->yaffs_dev->param.chunks_per_block,
 		  ctx->yaffs_dev->param.spare_bytes_per_chunk,
@@ -405,7 +406,8 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
 		  ctx->yaffs_dev->param.inband_tags,
 		  ctx->yaffs_dev->param.no_tags_ecc,
 		  ctx->yaffs_dev->param.skip_checkpt_rd,
-		  ctx->yaffs_dev->param.skip_checkpt_wr);
+		  ctx->yaffs_dev->param.skip_checkpt_wr,
+		  ctx->yaffs_dev->param.disable_summary);
 
 	return 0;
 }
