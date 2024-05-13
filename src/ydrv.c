@@ -120,20 +120,13 @@ static long long ydrv_get_data_offset_for_chunk(const struct ydrv_ctx *ctx,
 }
 
 /*
- * Check whether the given MTD block is a bad one.
- *
- * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
+ * Check whether the given MTD block is a bad one on NAND or NOR flash.
  */
-static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
-	const struct ydrv_ctx *ctx = dev->driver_context;
+static int ydrv_check_bad_nand_or_nor(const struct ydrv_ctx *ctx,
+				      int block_no) {
 	long long offset = block_no * ctx->block_size;
 	int err = 0;
 	int ret;
-
-	if (block_no < 0) {
-		ydrv_debug("block_no=%d", block_no);
-		return YAFFS_FAIL;
-	}
 
 	ret = linux_ioctl(ctx->mtd_fd, MEMGETBADBLOCK, &offset);
 	if (ret < 0) {
@@ -145,6 +138,29 @@ static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
 		   block_no, offset, offset, ret, err, util_get_error(err));
 
 	return (ret == 0 ? YAFFS_OK : YAFFS_FAIL);
+}
+
+/*
+ * Check whether the given MTD block is a bad one.
+ *
+ * (This is the 'drv_check_bad_fn' callback of struct yaffs_driver.)
+ */
+static int ydrv_check_bad(struct yaffs_dev *dev, int block_no) {
+	const struct ydrv_ctx *ctx = dev->driver_context;
+
+	if (block_no < 0) {
+		ydrv_debug("block_no=%d", block_no);
+		return YAFFS_FAIL;
+	}
+
+	switch (ctx->mtd_type) {
+	case MTD_TYPE_NAND:
+	case MTD_TYPE_NOR:
+		return ydrv_check_bad_nand_or_nor(ctx, block_no);
+	default:
+		log("unknown MTD type %d", ctx->mtd_type);
+		return YAFFS_FAIL;
+	}
 }
 
 /*
