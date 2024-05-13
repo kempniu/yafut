@@ -240,8 +240,9 @@ override_yaffs_geometry_from_options(const struct mtd_ctx *ctx,
 }
 
 /*
- * Determine the MTD type and the values to use for 'chunk_size' and
- * 'block_size':
+ * Determine the type of flash memory represented by the provided MTD character
+ * device.  Based on that information and the provided command-line options,
+ * determine the Yaffs geometry to use:
  *
  *  1. If NOR flash is detected, use default chunk size and block size values
  *     used by Yaffs code when creating Yaffs2 file system images.  (NOR flash
@@ -255,11 +256,10 @@ override_yaffs_geometry_from_options(const struct mtd_ctx *ctx,
  *  2. If -C and/or -B were used, override any default values with those
  *     provided on the command line.
  */
-static void init_yaffs_geometry(const struct mtd_ctx *ctx,
-				const struct mtd_info_user *mtd,
-				const struct opts *opts,
-				unsigned int oobavail,
-				struct mtd_geometry *geometry) {
+static void init_yaffs_geometry_nand_or_nor(const struct mtd_ctx *ctx,
+					    const struct mtd_info_user *mtd,
+					    const struct opts *opts,
+					    struct mtd_geometry *geometry) {
 	if (mtd->oobsize == 0 && mtd->writesize == 1) {
 		mtd_debug(ctx, "NOR flash detected");
 		init_yaffs_geometry_default(ctx, geometry, MTD_TYPE_NOR);
@@ -272,8 +272,31 @@ static void init_yaffs_geometry(const struct mtd_ctx *ctx,
 	override_yaffs_geometry_from_options(ctx, opts, geometry);
 
 	geometry->block_count = mtd->size / geometry->block_size;
-	geometry->oob_size = mtd->oobsize;
+}
+
+/*
+ * Determine the type of the provided MTD (which can be either NAND or NOR
+ * flash) and the Yaffs geometry to use.  Store all the information gathered in
+ * 'geometry'.
+ */
+static int init_yaffs_geometry(const struct mtd_ctx *ctx,
+			       const struct opts *opts,
+			       struct mtd_geometry *geometry) {
+	struct mtd_info_user mtd;
+	unsigned int oobavail;
+	int ret;
+
+	ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
+	if (ret < 0) {
+		return ret;
+	}
+
+	init_yaffs_geometry_nand_or_nor(ctx, &mtd, opts, geometry);
+
+	geometry->oob_size = mtd.oobsize;
 	geometry->oobavail = oobavail;
+
+	return 0;
 }
 
 /*
@@ -354,8 +377,6 @@ static int init_yaffs_dev(struct mtd_ctx *ctx, const struct opts *opts,
  */
 static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 	struct mtd_geometry geometry;
-	struct mtd_info_user mtd;
-	unsigned int oobavail;
 	struct mtd_ctx *ctx;
 	int flags;
 	int ret;
@@ -375,12 +396,11 @@ static int init_mtd_context(const struct opts *opts, struct mtd_ctx **ctxp) {
 		goto err_free_ctx;
 	}
 
-	ret = discover_mtd_parameters(ctx, &mtd, &oobavail);
+	ret = init_yaffs_geometry(ctx, opts, &geometry);
 	if (ret < 0) {
+		log_error(ret, "unable to initialize Yaffs geometry");
 		goto err_close_mtd_fd;
 	}
-
-	init_yaffs_geometry(ctx, &mtd, opts, oobavail, &geometry);
 
 	ret = init_yaffs_dev(ctx, opts, &geometry);
 	if (ret < 0) {
