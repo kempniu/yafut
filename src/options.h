@@ -18,6 +18,7 @@
 	"[ -T ] "                                                              \
 	"[ -E ] "                                                              \
 	"[ -P ] "                                                              \
+	"[ -S ] "                                                              \
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
@@ -33,6 +34,7 @@
 	"    -T  force inband tags\n"                                          \
 	"    -E  disable ECC for tags\n"                                       \
 	"    -P  disable Yaffs2 checkpoints\n"                                 \
+	"    -S  disable writing Yaffs2 summaries\n"                           \
 	"    -v  verbose output (can be used up to two times)\n"               \
 	"    -h  show usage information and exit\n"
 
@@ -56,6 +58,7 @@ struct opts {
 	bool force_inband_tags;
 	bool disable_ecc_for_tags;
 	bool disable_checkpoints;
+	bool disable_summaries;
 };
 
 void options_parse_env(void);
