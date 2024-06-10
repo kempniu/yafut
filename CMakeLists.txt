@@ -58,6 +58,9 @@ target_include_directories(
 add_executable(
 	yafut
 	src/copy.c
+	src/file.c
+	src/file_driver_mtd.c
+	src/file_driver_posix.c
 	src/ioctl.c
 	src/log.c
 	src/main.c

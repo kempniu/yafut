@@ -16,9 +16,8 @@ static char *program_name;
 static int perform_action(struct opts *opts) {
 	switch (opts->mode) {
 	case PROGRAM_MODE_READ:
-		return copy_read_file_from_mtd(opts);
 	case PROGRAM_MODE_WRITE:
-		return copy_write_file_to_mtd(opts);
+		return copy_file_based_on_opts(opts);
 	default:
 		return -1;
 	};

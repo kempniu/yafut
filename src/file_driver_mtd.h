@@ -4,6 +4,6 @@
 
 #pragma once
 
-#include "options.h"
+#include "file_driver.h"
 
-int copy_file_based_on_opts(const struct opts *opts);
+extern const struct file_driver file_driver_mtd;
