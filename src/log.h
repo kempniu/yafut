@@ -10,6 +10,9 @@
 #define log(fmt, ...)                                                          \
 	log_location(__FILE__, __LINE__, __func__, 0, fmt, ##__VA_ARGS__)
 
+#define log_debug(fmt, ...)                                                    \
+	log_location(__FILE__, __LINE__, __func__, 1, fmt, ##__VA_ARGS__)
+
 #define log_error(err, fmt, ...)                                               \
 	log_error_location(__FILE__, __LINE__, __func__, err, fmt,             \
 			   ##__VA_ARGS__)
