@@ -68,6 +68,7 @@ add_executable(
 	src/options.c
 	src/util.c
 	src/yaffs_glue.c
+	src/ydriver.c
 	src/ydrv.c
 )
 
