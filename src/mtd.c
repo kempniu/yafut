@@ -703,3 +703,10 @@ ssize_t mtd_file_write(const struct mtd_ctx *ctx, int fd,
 
 	return ret;
 }
+
+/*
+ * Return the Yaffs device associated with the provided MTD context.
+ */
+struct yaffs_dev *mtd_get_device(const struct mtd_ctx *ctx) {
+	return ctx->yaffs_dev;
+}

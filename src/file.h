@@ -8,6 +8,7 @@
 
 enum file_type {
 	FILE_TYPE_POSIX,
+	FILE_TYPE_MTD,
 };
 
 /*

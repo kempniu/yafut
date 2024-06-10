@@ -22,3 +22,5 @@ ssize_t mtd_file_write(const struct mtd_ctx *ctx, int fd,
 		       const unsigned char *buf, size_t count);
 int mtd_file_get_mode(const struct mtd_ctx *ctx, int fd);
 int mtd_file_set_mode(const struct mtd_ctx *ctx, int fd, int mode);
+
+struct yaffs_dev *mtd_get_device(const struct mtd_ctx *ctx);

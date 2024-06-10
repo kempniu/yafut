@@ -7,10 +7,12 @@
 
 #include "file.h"
 #include "file_driver.h"
+#include "file_driver_mtd.h"
 #include "file_driver_posix.h"
 
 static const struct file_driver *file_drivers[] = {
 	[FILE_TYPE_POSIX] = &file_driver_posix,
+	[FILE_TYPE_MTD] = &file_driver_mtd,
 };
 
 static int file_driver_instantiate(const struct file_spec *spec,
