@@ -68,6 +68,7 @@ add_executable(
 	src/mtd.c
 	src/options.c
 	src/storage.c
+	src/storage_driver_nand.c
 	src/util.c
 	src/yaffs_glue.c
 	src/ydriver.c
