@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <fcntl.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -111,8 +112,46 @@ static int file_posix_get_mode(struct file *file, int *modep) {
 	return 0;
 }
 
+static bool file_posix_is_stdout(struct file *file) {
+	bool is_stdout;
+
+	is_stdout = (file->fd == STDOUT_FILENO);
+	log_debug("fd=%d, is_stdout=%d", file->fd, is_stdout);
+
+	return is_stdout;
+}
+
+static bool file_posix_is_regular_file(struct file *file) {
+	bool is_regular_file;
+	struct stat stat;
+	int ret;
+
+	ret = fstat(file->fd, &stat);
+	log_debug("fstat, fd=%d, ret=%d", file->fd, ret);
+
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "fstat() failed for '%s'", file->path);
+		return false;
+	}
+
+	is_regular_file = S_ISREG(stat.st_mode);
+	log_debug("fd=%d, mode=%04o, is_regular_file=%d", file->fd,
+		  stat.st_mode, is_regular_file);
+
+	return is_regular_file;
+}
+
+static bool file_posix_can_set_mode(struct file *file) {
+	return file_posix_is_stdout(file) || file_posix_is_regular_file(file);
+}
+
 static int file_posix_set_mode(struct file *file, int mode) {
 	int ret;
+
+	if (!file_posix_can_set_mode(file)) {
+		return 0;
+	}
 
 	ret = fchmod(file->fd, (mode_t)mode);
 	log_debug("fchmod, fd=%d, mode=%04o, ret=%d", file->fd, mode, ret);
