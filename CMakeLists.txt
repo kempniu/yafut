@@ -70,6 +70,7 @@ add_executable(
 	src/yaffs_glue.c
 	src/ydriver.c
 	src/ydriver_ioctl.c
+	src/ydriver_posix.c
 	src/ydrv.c
 )
 
