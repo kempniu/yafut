@@ -7,13 +7,11 @@
 
 #include "file.h"
 #include "file_driver.h"
-#include "file_driver_mtd.h"
 #include "file_driver_posix.h"
 #include "file_driver_yaffs.h"
 
 static const struct file_driver *file_drivers[] = {
 	[FILE_TYPE_POSIX] = &file_driver_posix,
-	[FILE_TYPE_MTD] = &file_driver_mtd,
 	[FILE_TYPE_YAFFS] = &file_driver_yaffs,
 };
 
