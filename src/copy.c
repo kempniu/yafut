@@ -38,12 +38,12 @@ static int copy_init(struct copy_operation *copy, const struct opts *opts) {
 
 	switch (opts->mode) {
 	case PROGRAM_MODE_READ:
-		copy->src.spec.type = FILE_TYPE_MTD;
+		copy->src.spec.type = FILE_TYPE_YAFFS;
 		copy->dst.spec.type = FILE_TYPE_POSIX;
 		return 0;
 	case PROGRAM_MODE_WRITE:
 		copy->src.spec.type = FILE_TYPE_POSIX;
-		copy->dst.spec.type = FILE_TYPE_MTD;
+		copy->dst.spec.type = FILE_TYPE_YAFFS;
 		return 0;
 	default:
 		return -EINVAL;

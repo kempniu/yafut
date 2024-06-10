@@ -6,4 +6,4 @@
 
 #include "file_driver.h"
 
-extern const struct file_driver file_driver_mtd;
+extern const struct file_driver file_driver_yaffs;

@@ -17,7 +17,7 @@ int log_level;
  * optional arguments following it); store the result into 'buf', which is
  * 'buf_size' bytes long.  This function does not print anything by itself.
  */
-int log_format(char *buf, size_t buf_size, const char *fmt, ...) {
+static int log_format(char *buf, size_t buf_size, const char *fmt, ...) {
 	va_list args;
 	int ret;
 
@@ -30,6 +30,27 @@ int log_format(char *buf, size_t buf_size, const char *fmt, ...) {
 	}
 
 	return 0;
+}
+
+/*
+ * Print the message provided in 'fmt' (and a va_list of optional arguments
+ * prepared by the caller) to stderr, prefixing it with the provided
+ * file/line/function information.
+ */
+static void log_location_varargs(const char *file, int line, const char *func,
+				 const char *fmt, va_list args) {
+	const char *relative_file = strrchr(file, '/');
+	char format[1024];
+	int ret;
+
+	ret = log_format(format, sizeof(format), "%s:%d: %s: %s\n",
+			 relative_file ? relative_file + 1 : file, line, func,
+			 fmt);
+	if (ret < 0) {
+		return;
+	}
+
+	vfprintf(stderr, format, args);
 }
 
 /*
@@ -49,27 +70,6 @@ void log_location(const char *file, int line, const char *func,
 	va_start(args, fmt);
 	log_location_varargs(file, line, func, fmt, args);
 	va_end(args);
-}
-
-/*
- * Print the message provided in 'fmt' (and a va_list of optional arguments
- * prepared by the caller) to stderr, prefixing it with the provided
- * file/line/function information.
- */
-void log_location_varargs(const char *file, int line, const char *func,
-			  const char *fmt, va_list args) {
-	const char *relative_file = strrchr(file, '/');
-	char format[1024];
-	int ret;
-
-	ret = log_format(format, sizeof(format), "%s:%d: %s: %s\n",
-			 relative_file ? relative_file + 1 : file, line, func,
-			 fmt);
-	if (ret < 0) {
-		return;
-	}
-
-	vfprintf(stderr, format, args);
 }
 
 /*

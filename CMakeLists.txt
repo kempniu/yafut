@@ -59,16 +59,22 @@ add_executable(
 	yafut
 	src/copy.c
 	src/file.c
-	src/file_driver_mtd.c
 	src/file_driver_posix.c
+	src/file_driver_yaffs.c
 	src/ioctl.c
+	src/layout.c
 	src/log.c
 	src/main.c
-	src/mtd.c
 	src/options.c
+	src/storage.c
+	src/storage_driver_image.c
+	src/storage_driver_nand.c
+	src/storage_driver_nor.c
 	src/util.c
 	src/yaffs_glue.c
-	src/ydrv.c
+	src/ydriver.c
+	src/ydriver_ioctl.c
+	src/ydriver_posix.c
 )
 
 set_target_properties(
