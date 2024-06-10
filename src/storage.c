@@ -19,6 +19,7 @@
 #include "storage.h"
 #include "storage_driver.h"
 #include "storage_driver_nand.h"
+#include "storage_driver_nor.h"
 #include "util.h"
 #include "ydriver.h"
 
@@ -44,6 +45,7 @@
 
 static const struct storage_driver *storage_drivers[] = {
 	&storage_driver_nand,
+	&storage_driver_nor,
 };
 
 static void storage_init(struct storage *storage, const struct opts *opts) {
