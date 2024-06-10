@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 enum file_type {
-	FILE_TYPE_NONE,
+	FILE_TYPE_POSIX,
 };
 
 /*
