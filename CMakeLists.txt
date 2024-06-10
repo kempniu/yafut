@@ -61,6 +61,7 @@ add_executable(
 	src/file.c
 	src/file_driver_mtd.c
 	src/file_driver_posix.c
+	src/file_driver_yaffs.c
 	src/ioctl.c
 	src/layout.c
 	src/log.c
