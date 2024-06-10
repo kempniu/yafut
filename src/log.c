@@ -38,9 +38,13 @@ int log_format(char *buf, size_t buf_size, const char *fmt, ...) {
  * information.  For logging specific error codes (e.g. errno values), use
  * log_error_location() instead.
  */
-void log_location(const char *file, int line, const char *func, const char *fmt,
-		  ...) {
+void log_location(const char *file, int line, const char *func,
+		  int message_log_level, const char *fmt, ...) {
 	va_list args;
+
+	if (log_level < message_log_level) {
+		return;
+	}
 
 	va_start(args, fmt);
 	log_location_varargs(file, line, func, fmt, args);

@@ -16,7 +16,7 @@
  */
 int util_get_errno_location(const char *file, int line, const char *func) {
 	if (errno <= 0) {
-		log_location(file, line, func,
+		log_location(file, line, func, 0,
 			     "errno unexpectedly set to %d, aborting", errno);
 		abort();
 	}
