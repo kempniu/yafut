@@ -6,7 +6,4 @@
 
 #include "options.h"
 
-int copy_read_file_from_mtd(const struct opts *opts);
-int copy_write_file_to_mtd(const struct opts *opts);
-
 int copy_file_based_on_opts(const struct opts *opts);
