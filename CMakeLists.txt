@@ -68,6 +68,7 @@ add_executable(
 	src/mtd.c
 	src/options.c
 	src/storage.c
+	src/storage_driver_image.c
 	src/storage_driver_nand.c
 	src/storage_driver_nor.c
 	src/util.c
