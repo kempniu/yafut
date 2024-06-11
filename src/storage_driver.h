@@ -4,11 +4,14 @@
 
 #pragma once
 
-#include <mtd/mtd-user.h>
 #include <sys/stat.h>
 
 #include "layout.h"
 #include "ydriver.h"
+
+#if !defined(NO_MTD_DEVICE)
+#include <mtd/mtd-user.h>
+#endif
 
 /*
  * The structure passed to each storage driver during the storage driver
@@ -18,7 +21,9 @@
  */
 struct storage_probe_info {
 	struct stat stat;
+#if !defined(NO_MTD_DEVICE)
 	struct mtd_info_user mtd_info;
+#endif
 };
 
 /*
