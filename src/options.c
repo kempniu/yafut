@@ -226,7 +226,11 @@ int options_validate(const struct opts *opts) {
 	case PROGRAM_MODE_READ:
 	case PROGRAM_MODE_WRITE:
 		if (!opts->device_path) {
-			log("MTD device path not specified, use -d");
+#if defined(NO_MTD_DEVICE)
+			log("Image path not specified, use -d");
+#else
+			log("MTD device/image path not specified, use -d");
+#endif
 			return -1;
 		}
 		if (!opts->src_path) {

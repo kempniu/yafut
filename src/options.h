@@ -6,9 +6,20 @@
 
 #include <stdbool.h>
 
+#if defined(NO_MTD_DEVICE)
+#define USAGE_FLAG_D "-d /path/to/yaffs.img "
+#define USAGE_DESC_D "    -d  path to the Yaffs image to use\n"
+#define USAGE_MTDIMAGE "image"
+#else
+#define USAGE_FLAG_D "-d { /dev/mtdX | /path/to/yaffs.img } "
+#define USAGE_DESC_D                                                           \
+	"    -d  path to the MTD character device or Yaffs image to use\n"
+#define USAGE_MTDIMAGE "MTD/image"
+#endif
+
 #define USAGE_MSG                                                              \
 	"Usage: %s "                                                           \
-	"-d { /dev/mtdX | /path/to/yaffs.img } "                               \
+	USAGE_FLAG_D                                                           \
 	"{ -r | -w } "                                                         \
 	"-i <src> "                                                            \
 	"-o <dst> "                                                            \
@@ -24,9 +35,9 @@
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
-	"    -d  path to the MTD character device (or Yaffs image) to use\n"   \
-	"    -r  read a file from the MTD into a local file\n"                 \
-	"    -w  write a local file to a file on the MTD\n"                    \
+	USAGE_DESC_D                                                           \
+	"    -r  read a file from the " USAGE_MTDIMAGE " into a local file\n"  \
+	"    -w  write a local file to a file on the " USAGE_MTDIMAGE "\n"     \
 	"    -i  path to the source file (use '-' to read from stdin)\n"       \
 	"    -o  path to the destination file (use '-' to write to stdout)\n"  \
 	"    -m  set destination file access permissions to <mode> (octal)\n"  \

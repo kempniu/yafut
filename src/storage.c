@@ -4,7 +4,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <mtd/mtd-user.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -12,17 +11,22 @@
 
 #include <yaffs_guts.h>
 
-#include "ioctl.h"
 #include "layout.h"
 #include "log.h"
 #include "options.h"
 #include "storage.h"
 #include "storage_driver.h"
 #include "storage_driver_image.h"
-#include "storage_driver_nand.h"
-#include "storage_driver_nor.h"
 #include "util.h"
 #include "ydriver.h"
+
+#if !defined(NO_MTD_DEVICE)
+#include <mtd/mtd-user.h>
+
+#include "ioctl.h"
+#include "storage_driver_nand.h"
+#include "storage_driver_nor.h"
+#endif
 
 /*
  * This module serves as a focal point for lower-level abstraction layers,
@@ -45,8 +49,10 @@
  */
 
 static const struct storage_driver *storage_drivers[] = {
+#if !defined(NO_MTD_DEVICE)
 	&storage_driver_nand,
 	&storage_driver_nor,
+#endif
 	&storage_driver_image,
 };
 
@@ -92,6 +98,8 @@ static int storage_probe_stat(struct storage *storage) {
 	return 0;
 }
 
+#if !defined(NO_MTD_DEVICE)
+
 static void storage_probe_mtd_info(struct storage *storage) {
 	struct mtd_info_user *mtd_info = &storage->probe_info.mtd_info;
 	int ret;
@@ -110,6 +118,8 @@ static void storage_probe_mtd_info(struct storage *storage) {
 		  mtd_info->erasesize, mtd_info->writesize, mtd_info->oobsize);
 }
 
+#endif
+
 static int storage_probe(struct storage *storage) {
 	int ret;
 
@@ -118,7 +128,9 @@ static int storage_probe(struct storage *storage) {
 		return ret;
 	}
 
+#if !defined(NO_MTD_DEVICE)
 	storage_probe_mtd_info(storage);
+#endif
 
 	return ret;
 }

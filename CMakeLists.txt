@@ -4,6 +4,8 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+include(CMakeDependentOption)
+include(CMakePushCheckState)
 include(CheckTypeSize)
 
 project(
@@ -14,6 +16,16 @@ project(
 check_type_size(loff_t LOFF_T)
 if(NOT HAVE_LOFF_T)
 	add_definitions(-DY_LOFF_T=off_t)
+endif()
+
+cmake_push_check_state()
+set(CMAKE_EXTRA_INCLUDE_FILES mtd/mtd-user.h)
+check_type_size(mtd_info_t MTD_INFO_T)
+cmake_pop_check_state()
+cmake_dependent_option(
+	WITH_MTD_DEVICE "Include support for MTD devices" ON HAVE_MTD_INFO_T OFF)
+if(NOT WITH_MTD_DEVICE)
+	add_definitions(-DNO_MTD_DEVICE)
 endif()
 
 execute_process(
@@ -68,21 +80,26 @@ add_executable(
 	src/file.c
 	src/file_driver_posix.c
 	src/file_driver_yaffs.c
-	src/ioctl.c
 	src/layout.c
 	src/log.c
 	src/main.c
 	src/options.c
 	src/storage.c
 	src/storage_driver_image.c
-	src/storage_driver_nand.c
-	src/storage_driver_nor.c
 	src/util.c
 	src/yaffs_glue.c
 	src/ydriver.c
-	src/ydriver_ioctl.c
 	src/ydriver_posix.c
 )
+
+if(WITH_MTD_DEVICE)
+	target_sources(yafut PRIVATE
+		src/ioctl.c
+		src/storage_driver_nand.c
+		src/storage_driver_nor.c
+		src/ydriver_ioctl.c
+		)
+endif()
 
 set_target_properties(
 	yafut

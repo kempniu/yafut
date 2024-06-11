@@ -91,12 +91,14 @@ long long ydriver_get_data_offset(const struct ydriver_data *ydriver_data,
  */
 int ydriver_get_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
 	switch (read_result) {
+#if !defined(NO_MTD_DEVICE)
 	case -EUCLEAN:
 		*ecc_result = YAFFS_ECC_RESULT_FIXED;
 		return YAFFS_OK;
 	case -EBADMSG:
 		*ecc_result = YAFFS_ECC_RESULT_UNFIXED;
 		return YAFFS_FAIL;
+#endif
 	case 0:
 		*ecc_result = YAFFS_ECC_RESULT_NO_ERROR;
 		return YAFFS_OK;
