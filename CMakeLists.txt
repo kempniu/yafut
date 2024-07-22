@@ -17,6 +17,11 @@ if(NOT HAVE_LOFF_T)
 endif()
 
 execute_process(
+	COMMAND sh handle_common.sh clean
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/yaffs2/direct/
+)
+
+execute_process(
 	COMMAND sh handle_common.sh copy
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/yaffs2/direct/
 )
