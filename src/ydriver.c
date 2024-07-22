@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-#include <errno.h>
 #include <stdio.h>
 
 #include <yaffs_guts.h>
@@ -81,29 +80,6 @@ long long ydriver_get_data_offset(const struct ydriver_data *ydriver_data,
 	chunk_in_block = chunk % chunks_per_block;
 
 	return (block * block_size) + (chunk_in_block * chunk_size);
-}
-
-/*
- * Helper function for the 'read_chunk' callback of a Yaffs driver that
- * translates the result code of a system call into an <ECC result, Yaffs
- * result code> tuple.  Yaffs uses these values to properly handle deficiencies
- * in flash memory.
- */
-int ydriver_get_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result) {
-	switch (read_result) {
-	case -EUCLEAN:
-		*ecc_result = YAFFS_ECC_RESULT_FIXED;
-		return YAFFS_OK;
-	case -EBADMSG:
-		*ecc_result = YAFFS_ECC_RESULT_UNFIXED;
-		return YAFFS_FAIL;
-	case 0:
-		*ecc_result = YAFFS_ECC_RESULT_NO_ERROR;
-		return YAFFS_OK;
-	default:
-		*ecc_result = YAFFS_ECC_RESULT_UNKNOWN;
-		return YAFFS_FAIL;
-	}
 }
 
 static int ydriver_check_bad(struct yaffs_dev *yaffs_device, int block_no) {

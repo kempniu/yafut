@@ -49,4 +49,3 @@ void ydriver_debug_hexdump_location(const char *file, int line,
 				    const char *func, const u8 *buf,
 				    int buf_len, const char *description);
 long long ydriver_get_data_offset(const struct ydriver_data *data, int chunk);
-int ydriver_get_ecc_result(int read_result, enum yaffs_ecc_result *ecc_result);
