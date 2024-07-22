@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <mtd/mtd-user.h>
 #include <sys/stat.h>
 
 #include "layout.h"
@@ -18,7 +17,7 @@
  */
 struct storage_probe_info {
 	struct stat stat;
-	struct mtd_info_user mtd_info;
+	void *platform_data;
 };
 
 /*

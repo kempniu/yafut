@@ -92,8 +92,8 @@ static int storage_probe_stat(struct storage *storage) {
 	return 0;
 }
 
-static void storage_probe_mtd_info(struct storage *storage) {
-	struct mtd_info_user *mtd_info = &storage->probe_info.mtd_info;
+static int storage_platform_data_get_mtd_info(struct storage *storage,
+					      struct mtd_info_user *mtd_info) {
 	int ret;
 
 	ret = linux_ioctl(storage->fd, MEMGETINFO, mtd_info);
@@ -101,13 +101,49 @@ static void storage_probe_mtd_info(struct storage *storage) {
 		ret = util_get_errno();
 		log_debug("unable to get MTD information for %s (error %d: %s)",
 			  storage->path, ret, util_get_error(ret));
-		return;
+		return ret;
 	}
 
 	log_debug("type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
 		  "oobsize=%d",
 		  mtd_info->type, mtd_info->flags, mtd_info->size,
 		  mtd_info->erasesize, mtd_info->writesize, mtd_info->oobsize);
+
+	return 0;
+}
+
+static int storage_platform_data_instantiate(struct storage *storage) {
+	struct mtd_info_user *mtd_info;
+	int ret;
+
+	mtd_info = calloc(1, sizeof(*mtd_info));
+	if (!mtd_info) {
+		return -ENOMEM;
+	}
+
+	ret = storage_platform_data_get_mtd_info(storage, mtd_info);
+	if (ret < 0) {
+		free(mtd_info);
+		return ret;
+	}
+
+	storage->probe_info.platform_data = mtd_info;
+
+	return 0;
+}
+
+static int storage_platform_probe(struct storage *storage) {
+	if (!S_ISCHR(storage->probe_info.stat.st_mode)) {
+		log_debug("%s is not a character device, ioctls suppressed",
+			  storage->path);
+		return 0;
+	}
+
+	return storage_platform_data_instantiate(storage);
+}
+
+static void storage_platform_destroy(struct storage *storage) {
+	free(storage->probe_info.platform_data);
 }
 
 static int storage_probe(struct storage *storage) {
@@ -118,9 +154,7 @@ static int storage_probe(struct storage *storage) {
 		return ret;
 	}
 
-	storage_probe_mtd_info(storage);
-
-	return ret;
+	return storage_platform_probe(storage);
 }
 
 static int storage_match_driver(struct storage *storage) {
@@ -222,6 +256,7 @@ static int storage_prepare(struct storage *storage, const struct opts *opts) {
 	ret = storage_setup_device(storage);
 	if (ret < 0) {
 		storage_close(storage);
+		storage_platform_destroy(storage);
 	}
 
 	return ret;
@@ -253,5 +288,7 @@ void storage_destroy(struct storage **storagep) {
 	*storagep = NULL;
 
 	storage_close(storage);
+	storage_platform_destroy(storage);
+
 	free(storage);
 }

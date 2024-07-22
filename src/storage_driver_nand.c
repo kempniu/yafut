@@ -8,7 +8,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include "layout.h"
@@ -19,16 +18,17 @@
 #include "ydriver_ioctl.h"
 
 static bool storage_nand_match(const struct storage_probe_info *probe_info) {
-	return (S_ISCHR(probe_info->stat.st_mode)
-		&& probe_info->mtd_info.oobsize > 0
-		&& probe_info->mtd_info.writesize > 1);
+	struct mtd_info_user *mtd_info = probe_info->platform_data;
+
+	return (mtd_info && mtd_info->oobsize > 0 && mtd_info->writesize > 1);
 }
 
 static int storage_nand_get_total_size(void *callback_data,
 				       unsigned int *total_sizep) {
 	struct storage *storage = callback_data;
+	struct mtd_info_user *mtd_info = storage->probe_info.platform_data;
 
-	*total_sizep = storage->probe_info.mtd_info.size;
+	*total_sizep = mtd_info->size;
 	log_debug("detected storage size: %u bytes", *total_sizep);
 
 	return 0;
@@ -37,8 +37,9 @@ static int storage_nand_get_total_size(void *callback_data,
 static int storage_nand_get_block_size(void *callback_data,
 				       unsigned int *block_sizep) {
 	struct storage *storage = callback_data;
+	struct mtd_info_user *mtd_info = storage->probe_info.platform_data;
 
-	*block_sizep = storage->probe_info.mtd_info.erasesize;
+	*block_sizep = mtd_info->erasesize;
 	log_debug("detected block size: %u bytes", *block_sizep);
 
 	return 0;
@@ -47,8 +48,9 @@ static int storage_nand_get_block_size(void *callback_data,
 static int storage_nand_get_chunk_size(void *callback_data,
 				       unsigned int *chunk_sizep) {
 	struct storage *storage = callback_data;
+	struct mtd_info_user *mtd_info = storage->probe_info.platform_data;
 
-	*chunk_sizep = storage->probe_info.mtd_info.writesize;
+	*chunk_sizep = mtd_info->writesize;
 	log_debug("detected chunk size: %u bytes", *chunk_sizep);
 
 	return 0;
@@ -57,8 +59,9 @@ static int storage_nand_get_chunk_size(void *callback_data,
 static int storage_nand_get_oob_size(void *callback_data,
 				     unsigned int *oob_sizep) {
 	struct storage *storage = callback_data;
+	struct mtd_info_user *mtd_info = storage->probe_info.platform_data;
 
-	*oob_sizep = storage->probe_info.mtd_info.oobsize;
+	*oob_sizep = mtd_info->oobsize;
 	log_debug("detected OOB data size: %u bytes", *oob_sizep);
 
 	return 0;
