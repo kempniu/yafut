@@ -44,10 +44,11 @@
  *     storage driver and a data structure containing layout information.
  */
 
-static const struct storage_driver *storage_drivers[] = {
+static const struct storage_driver *storage_platform_drivers[] = {
 	&storage_driver_nand,
 	&storage_driver_nor,
 	&storage_driver_image,
+	NULL,
 };
 
 static void storage_init(struct storage *storage, const struct opts *opts) {
@@ -158,10 +159,10 @@ static int storage_probe(struct storage *storage) {
 }
 
 static int storage_match_driver(struct storage *storage) {
-	int driver_count = sizeof(storage_drivers) / sizeof(storage_drivers[0]);
+	const struct storage_driver *driver;
 
-	for (int i = 0; i < driver_count; i++) {
-		const struct storage_driver *driver = storage_drivers[i];
+	for (int i = 0; storage_platform_drivers[i] != NULL; i++) {
+		driver = storage_platform_drivers[i];
 
 		log_debug("trying driver %s", driver->name);
 
