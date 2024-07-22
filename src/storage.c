@@ -4,23 +4,18 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <mtd/mtd-user.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <yaffs_guts.h>
 
-#include "ioctl.h"
 #include "layout.h"
 #include "log.h"
 #include "options.h"
 #include "storage.h"
 #include "storage_driver.h"
-#include "storage_driver_image.h"
-#include "storage_driver_nand.h"
-#include "storage_driver_nor.h"
+#include "storage_platform.h"
 #include "util.h"
 #include "ydriver.h"
 
@@ -43,13 +38,6 @@
  *   - the Yaffs driver is set up with callbacks provided by the selected
  *     storage driver and a data structure containing layout information.
  */
-
-static const struct storage_driver *storage_platform_drivers[] = {
-	&storage_driver_nand,
-	&storage_driver_nor,
-	&storage_driver_image,
-	NULL,
-};
 
 static void storage_init(struct storage *storage, const struct opts *opts) {
 	*storage = (struct storage){
@@ -91,60 +79,6 @@ static int storage_probe_stat(struct storage *storage) {
 	log_debug("st_mode=%x, st_size=%ld", stat->st_mode, stat->st_size);
 
 	return 0;
-}
-
-static int storage_platform_data_get_mtd_info(struct storage *storage,
-					      struct mtd_info_user *mtd_info) {
-	int ret;
-
-	ret = linux_ioctl(storage->fd, MEMGETINFO, mtd_info);
-	if (ret < 0) {
-		ret = util_get_errno();
-		log_debug("unable to get MTD information for %s (error %d: %s)",
-			  storage->path, ret, util_get_error(ret));
-		return ret;
-	}
-
-	log_debug("type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
-		  "oobsize=%d",
-		  mtd_info->type, mtd_info->flags, mtd_info->size,
-		  mtd_info->erasesize, mtd_info->writesize, mtd_info->oobsize);
-
-	return 0;
-}
-
-static int storage_platform_data_instantiate(struct storage *storage) {
-	struct mtd_info_user *mtd_info;
-	int ret;
-
-	mtd_info = calloc(1, sizeof(*mtd_info));
-	if (!mtd_info) {
-		return -ENOMEM;
-	}
-
-	ret = storage_platform_data_get_mtd_info(storage, mtd_info);
-	if (ret < 0) {
-		free(mtd_info);
-		return ret;
-	}
-
-	storage->probe_info.platform_data = mtd_info;
-
-	return 0;
-}
-
-static int storage_platform_probe(struct storage *storage) {
-	if (!S_ISCHR(storage->probe_info.stat.st_mode)) {
-		log_debug("%s is not a character device, ioctls suppressed",
-			  storage->path);
-		return 0;
-	}
-
-	return storage_platform_data_instantiate(storage);
-}
-
-static void storage_platform_destroy(struct storage *storage) {
-	free(storage->probe_info.platform_data);
 }
 
 static int storage_probe(struct storage *storage) {
