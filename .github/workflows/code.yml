@@ -16,12 +16,15 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
     strategy:
       matrix:
         image: ['alpine:3.19', 'debian:12', 'fedora:40', 'redhat/ubi9:latest', 'ubuntu:24.04']
         compiler: ['clang', 'gcc']
-    container: ${{ matrix.image }}
+        include:
+          - image: 'macos-14'
+            compiler: 'clang'
+    runs-on: ${{ !startsWith(matrix.image, 'macos') && 'ubuntu-22.04' || matrix.image }}
+    container: ${{ !startsWith(matrix.image, 'macos') && matrix.image || null }}
     name: Build (${{ matrix.image }}, ${{ matrix.compiler }})
     steps:
       - name: Update package repository metadata
