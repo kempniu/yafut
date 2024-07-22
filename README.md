@@ -11,13 +11,12 @@ SPDX-License-Identifier: GPL-2.0-only
 
 ## Overview
 
-Yafut is a basic file copying utility for the Linux operating system
-that employs [Yaffs Direct Interface (YDI)][YDI] and Linux [Memory
-Technology Devices (MTD)][MTD] ioctls to interact with Yaffs file
-systems from userspace.  It enables copying files from/to Yaffs file
-systems even if the kernel does not have native support for the Yaffs
-file system compiled in.  Yafut also has limited support for copying
-files from/to Yaffs file system images stored in regular files.
+Yafut is a basic file copying utility for Unix-like operating systems
+that employs [Yaffs Direct Interface (YDI)][YDI] to interact with Yaffs
+file systems from userspace.  It enables copying files from/to Yaffs
+file systems even if the kernel does not have native support for the
+Yaffs file system compiled in.  Yafut also has limited support for
+copying files from/to Yaffs file system images stored in regular files.
 
 ## Requirements
 
@@ -27,15 +26,26 @@ files from/to Yaffs file system images stored in regular files.
  - CMake 3.16+ (with a CMake-supported build tool, e.g. GNU Make, Ninja)
  - Yaffs source code (included as a Git submodule)
  - C standard library header files
- - Linux kernel header files
+ - for NAND/NOR flash support (Linux only): Linux kernel header files
 
 ### Runtime Requirements
 
- - Linux kernel with MTD support enabled
+ - POSIX-compatible C standard library
+ - for NAND/NOR flash support (Linux only):
     - Linux kernel 6.1 or newer for NAND flash
     - Linux kernel 3.2 or newer for NOR flash
- - glibc or musl libc (other C standard libraries should also work, but
-   have not been tested)
+
+## Supported Yaffs File System Storage Types
+
+### Linux
+
+ - NAND flash
+ - NOR flash
+ - regular files (file system images)
+
+### macOS
+
+ - regular files (file system images)
 
 ## Building
 
@@ -44,14 +54,14 @@ files from/to Yaffs file system images stored in regular files.
 
 ## Usage Examples
 
-To copy a file called `foo` from the MTD partition represented by the
+To copy a file called `foo` from the flash partition represented by the
 character device `/dev/mtd1` to a local file called `bar`, run:
 
     yafut -d /dev/mtd1 -r -i foo -o bar
 
-(Run `cat /proc/mtd` to list all available MTD partitions.)
+(Run `cat /proc/mtd` on Linux to list all available flash partitions.)
 
-To copy a local file called `baz` to a file called `qux` on the MTD
+To copy a local file called `baz` to a file called `qux` on the flash
 partition represented by the character device `/dev/mtd2`, run:
 
     yafut -d /dev/mtd2 -w -i baz -o qux
@@ -65,17 +75,22 @@ while the second command above could also be written as:
 
     cat baz | yafut -d /dev/mtd2 -w -i - -o qux
 
+To use a Yaffs file system image instead of a flash partition, replace
+`/dev/mtdX` with the path to the regular file containing the image.
+
 Run `yafut -h` for further usage instructions.
 
 ## FAQ
 
 ### Which flash memory types does this tool work with?
 
-Yafut supports both NAND flash and NOR flash.  However, while most
-parameters for an existing Yaffs file system stored on NAND flash can be
-autodetected, the Yaffs layout used on NOR flash can be fairly arbitrary
-and therefore Yaffs parameters for such a file system will likely need
-to be provided manually (see the next question below).
+On Linux, Yafut supports both NAND flash and NOR flash, which are
+collectively referred to below as MTDs ([Memory Technology
+Devices][MTD]).  However, while most parameters for an existing Yaffs
+file system stored on NAND flash can be autodetected, the Yaffs layout
+used on NOR flash can be fairly arbitrary and therefore Yaffs parameters
+for such a file system will likely need to be provided manually (see the
+next question below).
 
 ### Do I need to manually set any Yaffs parameters?
 
@@ -131,10 +146,11 @@ options are:
 Yaffs code that Yafut builds upon supports both Yaffs1 and Yaffs2 file
 systems.  Yafut assumes that NAND devices with 512-byte pages use Yaffs1
 while those with 1024-byte or larger pages use Yaffs2.  All NOR devices
-are assumed to use Yaffs2 by default.  While the autodetected Yaffs
-layout can be tweaked using the `-C` and `-B` command-line options (see
-above), there is currently no way to override the chunk size threshold
-used for autodetecting the Yaffs file system version used.
+and Yaffs file system images are assumed to use Yaffs2 by default.
+While the autodetected Yaffs layout can be tweaked using the `-C` and
+`-B` command-line options (see above), there is currently no way to
+override the chunk size threshold used for autodetecting the Yaffs file
+system version used.
 
 ### What's the deal with the Linux kernel version requirements?
 
@@ -176,7 +192,7 @@ No.  Here is why:
     autoplacement mechanism for writing to the OOB area) and the concept
     of customizing the OOB layout does not really apply for Yaffs1.
 
-### Is this tool also able to work with Yaffs image files?
+### Is this tool also able to work with Yaffs file system images?
 
 Yes, to an extent.  The argument passed via the `-d` command-line option
 can be a path to either an MTD character device representing NAND/NOR
