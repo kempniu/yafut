@@ -71,7 +71,6 @@ int ydriver_posix_read_chunk(struct ydriver_data *ydriver_data, int chunk,
 			     u8 *data, int data_len, u8 *oob, int oob_len,
 			     enum yaffs_ecc_result *ecc_result_out) {
 	long long offset = ydriver_get_data_offset(ydriver_data, chunk);
-	enum yaffs_ecc_result ecc_result;
 	int err = 0;
 	int ret;
 
@@ -89,13 +88,16 @@ int ydriver_posix_read_chunk(struct ydriver_data *ydriver_data, int chunk,
 		  util_get_error(err));
 	ydriver_debug_hexdump(data, data_len, "data");
 
-	ret = ydriver_get_ecc_result(ret < 0 ? ret : 0, &ecc_result);
-
 	if (ecc_result_out) {
-		*ecc_result_out = ecc_result;
+		*ecc_result_out = (ret < 0 ? YAFFS_ECC_RESULT_UNKNOWN
+					   : YAFFS_ECC_RESULT_NO_ERROR);
 	}
 
-	return ret;
+	if (ret < 0) {
+		return YAFFS_FAIL;
+	}
+
+	return YAFFS_OK;
 }
 
 int ydriver_posix_write_chunk(struct ydriver_data *ydriver_data, int chunk,

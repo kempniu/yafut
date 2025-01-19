@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
+#include <errno.h>
 #include <mtd/mtd-user.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -85,6 +86,24 @@ int ydriver_ioctl_mark_bad(struct ydriver_data *ydriver_data, int block_no) {
 	return YAFFS_OK;
 }
 
+static int ydriver_ioctl_get_ecc_result(int read_result,
+					enum yaffs_ecc_result *ecc_result) {
+	switch (read_result) {
+	case -EUCLEAN:
+		*ecc_result = YAFFS_ECC_RESULT_FIXED;
+		return YAFFS_OK;
+	case -EBADMSG:
+		*ecc_result = YAFFS_ECC_RESULT_UNFIXED;
+		return YAFFS_FAIL;
+	case 0:
+		*ecc_result = YAFFS_ECC_RESULT_NO_ERROR;
+		return YAFFS_OK;
+	default:
+		*ecc_result = YAFFS_ECC_RESULT_UNKNOWN;
+		return YAFFS_FAIL;
+	}
+}
+
 int ydriver_ioctl_read_chunk(struct ydriver_data *ydriver_data, int chunk,
 			     u8 *data, int data_len, u8 *oob, int oob_len,
 			     enum yaffs_ecc_result *ecc_result_out) {
@@ -115,7 +134,7 @@ int ydriver_ioctl_read_chunk(struct ydriver_data *ydriver_data, int chunk,
 	ydriver_debug_hexdump(data, data_len, "data");
 	ydriver_debug_hexdump(oob, oob_len, "oob");
 
-	ret = ydriver_get_ecc_result(ret, &ecc_result);
+	ret = ydriver_ioctl_get_ecc_result(ret, &ecc_result);
 
 	if (ecc_result_out) {
 		*ecc_result_out = ecc_result;

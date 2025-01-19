@@ -4,23 +4,18 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <mtd/mtd-user.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <yaffs_guts.h>
 
-#include "ioctl.h"
 #include "layout.h"
 #include "log.h"
 #include "options.h"
 #include "storage.h"
 #include "storage_driver.h"
-#include "storage_driver_image.h"
-#include "storage_driver_nand.h"
-#include "storage_driver_nor.h"
+#include "storage_platform.h"
 #include "util.h"
 #include "ydriver.h"
 
@@ -43,12 +38,6 @@
  *   - the Yaffs driver is set up with callbacks provided by the selected
  *     storage driver and a data structure containing layout information.
  */
-
-static const struct storage_driver *storage_drivers[] = {
-	&storage_driver_nand,
-	&storage_driver_nor,
-	&storage_driver_image,
-};
 
 static void storage_init(struct storage *storage, const struct opts *opts) {
 	*storage = (struct storage){
@@ -92,24 +81,6 @@ static int storage_probe_stat(struct storage *storage) {
 	return 0;
 }
 
-static void storage_probe_mtd_info(struct storage *storage) {
-	struct mtd_info_user *mtd_info = &storage->probe_info.mtd_info;
-	int ret;
-
-	ret = linux_ioctl(storage->fd, MEMGETINFO, mtd_info);
-	if (ret < 0) {
-		ret = util_get_errno();
-		log_debug("unable to get MTD information for %s (error %d: %s)",
-			  storage->path, ret, util_get_error(ret));
-		return;
-	}
-
-	log_debug("type=%d, flags=0x%08x, size=%d, erasesize=%d, writesize=%d, "
-		  "oobsize=%d",
-		  mtd_info->type, mtd_info->flags, mtd_info->size,
-		  mtd_info->erasesize, mtd_info->writesize, mtd_info->oobsize);
-}
-
 static int storage_probe(struct storage *storage) {
 	int ret;
 
@@ -118,16 +89,14 @@ static int storage_probe(struct storage *storage) {
 		return ret;
 	}
 
-	storage_probe_mtd_info(storage);
-
-	return ret;
+	return storage_platform_probe(storage);
 }
 
 static int storage_match_driver(struct storage *storage) {
-	int driver_count = sizeof(storage_drivers) / sizeof(storage_drivers[0]);
+	const struct storage_driver *driver;
 
-	for (int i = 0; i < driver_count; i++) {
-		const struct storage_driver *driver = storage_drivers[i];
+	for (int i = 0; storage_platform_drivers[i] != NULL; i++) {
+		driver = storage_platform_drivers[i];
 
 		log_debug("trying driver %s", driver->name);
 
@@ -222,6 +191,7 @@ static int storage_prepare(struct storage *storage, const struct opts *opts) {
 	ret = storage_setup_device(storage);
 	if (ret < 0) {
 		storage_close(storage);
+		storage_platform_destroy(storage);
 	}
 
 	return ret;
@@ -253,5 +223,7 @@ void storage_destroy(struct storage **storagep) {
 	*storagep = NULL;
 
 	storage_close(storage);
+	storage_platform_destroy(storage);
+
 	free(storage);
 }

@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <mtd/mtd-user.h>
 #include <stdbool.h>
-#include <sys/stat.h>
 
 #include "layout.h"
 #include "log.h"
@@ -15,16 +14,17 @@
 #include "ydriver_posix.h"
 
 static bool storage_nor_match(const struct storage_probe_info *probe_info) {
-	return (S_ISCHR(probe_info->stat.st_mode)
-		&& probe_info->mtd_info.oobsize == 0
-		&& probe_info->mtd_info.writesize == 1);
+	struct mtd_info_user *mtd_info = probe_info->platform_data;
+
+	return (mtd_info && mtd_info->oobsize == 0 && mtd_info->writesize == 1);
 }
 
 static int storage_nor_get_total_size(void *callback_data,
 				      unsigned int *total_sizep) {
 	struct storage *storage = callback_data;
+	struct mtd_info_user *mtd_info = storage->probe_info.platform_data;
 
-	*total_sizep = storage->probe_info.mtd_info.size;
+	*total_sizep = mtd_info->size;
 	log_debug("detected storage size: %u bytes", *total_sizep);
 
 	return 0;
