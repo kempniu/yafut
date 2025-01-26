@@ -76,9 +76,13 @@ add_executable(
 	src/layout.c
 	src/log.c
 	src/main.c
+	src/object.c
 	src/options.c
+	src/printer.c
+	src/printer_driver_text.c
 	src/storage.c
 	src/storage_driver_image.c
+	src/tree.c
 	src/util.c
 	src/yaffs_glue.c
 	src/ydriver.c
