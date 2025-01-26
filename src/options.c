@@ -91,7 +91,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.byte_order = BYTE_ORDER_CPU,
 	};
 
-	while ((opt = getopt(argc, argv, "B:C:d:Ehi:LMm:o:PrSTvw")) != -1) {
+	while ((opt = getopt(argc, argv, "B:C:d:Ehi:LMm:o:PrStTvw")) != -1) {
 		switch (opt) {
 		case 'B':
 			if (opts->block_size != SIZE_UNSPECIFIED) {
@@ -184,6 +184,13 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 				return -1;
 			}
 			opts->disable_summaries = true;
+			break;
+		case 't':
+			if (opts->preserve_timestamps) {
+				log("-t can only be used once");
+				return -1;
+			}
+			opts->preserve_timestamps = true;
 			break;
 		case 'T':
 			if (opts->force_inband_tags) {

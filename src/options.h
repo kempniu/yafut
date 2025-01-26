@@ -13,6 +13,7 @@
 	"-i <src> "                                                            \
 	"-o <dst> "                                                            \
 	"[ -m <mode> ] "                                                       \
+	"[ -t ] "                                                              \
 	"[ -C <bytes> ] "                                                      \
 	"[ -B <bytes> ] "                                                      \
 	"[ -T ] "                                                              \
@@ -31,6 +32,7 @@
 	"    -o  path to the destination file (use '-' to write to stdout)\n"  \
 	"    -m  set destination file access permissions to <mode> (octal)\n"  \
 	"        (default: copy access permissions from <src>)\n"              \
+	"    -t  preserve file modification times when copying\n"              \
 	"    -C  force Yaffs chunk size to <bytes> (use 'k' suffix for KiB)\n" \
 	"    -B  force Yaffs block size to <bytes> (use 'k' suffix for KiB)\n" \
 	"    -T  force inband tags\n"                                          \
@@ -65,6 +67,7 @@ struct opts {
 	int dst_mode;
 	int chunk_size;
 	int block_size;
+	bool preserve_timestamps;
 	bool force_inband_tags;
 	bool disable_ecc_for_tags;
 	bool disable_checkpoints;
