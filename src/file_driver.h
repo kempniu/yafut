@@ -16,6 +16,8 @@ struct file_ops {
 	int (*write)(struct file *file, const unsigned char *buf, size_t count);
 	int (*get_mode)(struct file *file, int *modep);
 	int (*set_mode)(struct file *file, int mode);
+	int (*get_mtime)(struct file *file, unsigned long long *mtimep);
+	int (*set_mtime)(struct file *file, unsigned long long mtime);
 };
 
 struct file {

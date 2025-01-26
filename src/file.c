@@ -91,3 +91,11 @@ int file_get_mode(struct file *file, int *modep) {
 int file_set_mode(struct file *file, int mode) {
 	return file->ops->set_mode(file, mode);
 }
+
+int file_get_mtime(struct file *file, unsigned long long *mtimep) {
+	return file->ops->get_mtime(file, mtimep);
+}
+
+int file_set_mtime(struct file *file, unsigned long long mtime) {
+	return file->ops->set_mtime(file, mtime);
+}

@@ -161,6 +161,42 @@ static int file_yaffs_set_mode(struct file *file, int mode) {
 	return ret;
 }
 
+static int file_yaffs_get_mtime(struct file *file, unsigned long long *mtimep) {
+	struct yaffs_stat stat;
+	int ret;
+
+	ret = yaffs_fstat(file->fd, &stat);
+	log_debug("yaffs_fstat, fd=%d, ret=%d", file->fd, ret);
+
+	if (ret < 0) {
+		ret = yaffsfs_GetLastError();
+		log_error(ret, "error getting modification time for '%s'",
+			  file->path);
+		return ret;
+	}
+
+	*mtimep = stat.yst_mtime;
+	log_debug("yaffs_fstat, fd=%d, mtime=%llu", file->fd, *mtimep);
+
+	return 0;
+}
+
+int file_yaffs_set_mtime(struct file *file, unsigned long long mtime) {
+	const struct yaffs_utimbuf time = {.actime = mtime, .modtime = mtime};
+	int ret;
+
+	ret = yaffs_futime(file->fd, &time);
+	log_debug("yaffs_futime, fd=%d, ret=%d", file->fd, ret);
+
+	if (ret < 0) {
+		ret = yaffsfs_GetLastError();
+		log_error(ret, "error setting modification time for '%s'",
+			  file->path);
+	}
+
+	return ret;
+}
+
 static const struct file_ops file_ops_yaffs = {
 	.open_for_reading = file_yaffs_open_for_reading,
 	.open_for_writing = file_yaffs_open_for_writing,
@@ -169,6 +205,8 @@ static const struct file_ops file_ops_yaffs = {
 	.write = file_yaffs_write,
 	.get_mode = file_yaffs_get_mode,
 	.set_mode = file_yaffs_set_mode,
+	.get_mtime = file_yaffs_get_mtime,
+	.set_mtime = file_yaffs_set_mtime,
 };
 
 const struct file_driver file_driver_yaffs = {

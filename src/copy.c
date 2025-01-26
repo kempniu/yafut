@@ -165,6 +165,22 @@ static int copy_or_set_file_mode(struct copy_operation *copy) {
 	return file_set_mode(copy->dst.file, copy->opts->dst_mode);
 }
 
+static int copy_file_modification_time(struct copy_operation *copy) {
+	unsigned long long src_mtime;
+	int ret;
+
+	if (!copy->opts->preserve_timestamps) {
+		return 0;
+	}
+
+	ret = file_get_mtime(copy->src.file, &src_mtime);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return file_set_mtime(copy->dst.file, src_mtime);
+}
+
 static int copy_perform(struct copy_operation *copy) {
 	int ret;
 
@@ -173,7 +189,12 @@ static int copy_perform(struct copy_operation *copy) {
 		return ret;
 	}
 
-	return copy_or_set_file_mode(copy);
+	ret = copy_or_set_file_mode(copy);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return copy_file_modification_time(copy);
 }
 
 static void copy_destroy(struct copy_operation *copy) {

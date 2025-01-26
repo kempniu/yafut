@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "file_driver.h"
@@ -142,14 +143,14 @@ static bool file_posix_is_regular_file(struct file *file) {
 	return is_regular_file;
 }
 
-static bool file_posix_can_set_mode(struct file *file) {
+static bool file_posix_can_set_attributes(struct file *file) {
 	return file_posix_is_stdout(file) || file_posix_is_regular_file(file);
 }
 
 static int file_posix_set_mode(struct file *file, int mode) {
 	int ret;
 
-	if (!file_posix_can_set_mode(file)) {
+	if (!file_posix_can_set_attributes(file)) {
 		return 0;
 	}
 
@@ -165,6 +166,46 @@ static int file_posix_set_mode(struct file *file, int mode) {
 	return ret;
 }
 
+int file_posix_get_mtime(struct file *file, unsigned long long *mtimep) {
+	struct stat stat;
+	int ret;
+
+	ret = fstat(file->fd, &stat);
+	log_debug("fstat, fd=%d, ret=%d", file->fd, ret);
+
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "error getting modification time for '%s'",
+			  file->path);
+		return ret;
+	}
+
+	*mtimep = stat.st_mtime;
+	log_debug("fstat, fd=%d, mtime=%llu", file->fd, *mtimep);
+
+	return 0;
+}
+
+int file_posix_set_mtime(struct file *file, unsigned long long mtime) {
+	const struct timespec times[] = {{.tv_sec = mtime}, {.tv_sec = mtime}};
+	int ret;
+
+	if (!file_posix_can_set_attributes(file)) {
+		return 0;
+	}
+
+	ret = futimens(file->fd, times);
+	log_debug("futimens, fd=%d, ret=%d", file->fd, ret);
+
+	if (ret < 0) {
+		ret = util_get_errno();
+		log_error(ret, "error setting modification time for '%s'",
+			  file->path);
+	}
+
+	return ret;
+}
+
 static const struct file_ops file_ops_posix = {
 	.open_for_reading = file_posix_open_for_reading,
 	.open_for_writing = file_posix_open_for_writing,
@@ -173,6 +214,8 @@ static const struct file_ops file_ops_posix = {
 	.write = file_posix_write,
 	.get_mode = file_posix_get_mode,
 	.set_mode = file_posix_set_mode,
+	.get_mtime = file_posix_get_mtime,
+	.set_mtime = file_posix_set_mtime,
 };
 
 const struct file_driver file_driver_posix = {
