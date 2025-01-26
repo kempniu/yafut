@@ -54,6 +54,11 @@ copying files from/to Yaffs file system images stored in regular files.
 
 ## Usage Examples
 
+To list the contents of the flash partition represented by the
+character device `/dev/mtd0`, run:
+
+    yafut -d /dev/mtd0 -l
+
 To copy a file called `foo` from the flash partition represented by the
 character device `/dev/mtd1` to a local file called `bar`, run:
 
@@ -140,6 +145,13 @@ options are:
     order used on the MTD is the same as the byte order used by the host
     CPU.  This can be overridden if necessary, allowing little-endian
     hosts to operate on big-endian file systems and vice versa.
+
+### How do I know whether the parameters I used are correct?
+
+If you have reasons to believe that the Yaffs file system you are
+working with is not empty, try listing its contents using the `-l`
+command-line option.  If Yafut lists anything except a `/lost+found`
+directory, the Yaffs layout parameters used are most likely correct.
 
 ### Which Yaffs file system versions does this tool work with?
 

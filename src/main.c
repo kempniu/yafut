@@ -6,6 +6,7 @@
 
 #include "copy.h"
 #include "options.h"
+#include "tree.h"
 
 static char *program_name;
 
@@ -15,6 +16,8 @@ static char *program_name;
  */
 static int perform_action(struct opts *opts) {
 	switch (opts->mode) {
+	case PROGRAM_MODE_LIST:
+		return tree_print_based_on_opts(opts);
 	case PROGRAM_MODE_READ:
 	case PROGRAM_MODE_WRITE:
 		return copy_file_based_on_opts(opts);

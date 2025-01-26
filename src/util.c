@@ -4,6 +4,8 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -61,4 +63,61 @@ int util_parse_number(const char *string, int base, unsigned int *result) {
 	*result = ret;
 
 	return 0;
+}
+
+/*
+ * Extract substrings delimited by any of the characters in 'delimiters' from
+ * the string pointed to by 'stringp'.  Stop after extracting 'max_tokens'
+ * substrings or reaching the end of the processed string, whichever happens
+ * first.  Update 'stringp' to point past the last extracted substring, so that
+ * this function can be conveniently used in a loop.  Variadic arguments are
+ * <char *, size_t> tuples describing the target buffers that the substrings
+ * should be copied to.
+ */
+int util_get_tokens(const char **stringp, const char *delimiters,
+		    unsigned int max_tokens, ...) {
+	const char *string = *stringp;
+	unsigned int tokens_found = 0;
+	va_list args;
+	int ret = 0;
+
+	if (string[0] == '\0') {
+		return -EPIPE;
+	}
+
+	va_start(args, max_tokens);
+	while (tokens_found < max_tokens) {
+		char *buf;
+		size_t buf_size;
+		size_t token_length;
+
+		if (string[0] == '\0') {
+			ret = -EINTR;
+			break;
+		}
+
+		buf = va_arg(args, char *);
+		buf_size = va_arg(args, size_t);
+
+		token_length = strcspn(string, delimiters);
+		if (token_length + 1 > buf_size) {
+			ret = -ENOSPC;
+			break;
+		}
+
+		memmove(buf, string, token_length);
+		buf[token_length] = '\0';
+
+		string += token_length;
+		if (string[0] != '\0') {
+			string++;
+		}
+
+		tokens_found++;
+	}
+	va_end(args);
+
+	*stringp = string;
+
+	return ret;
 }

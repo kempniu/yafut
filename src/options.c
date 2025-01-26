@@ -89,9 +89,10 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 		.chunk_size = SIZE_UNSPECIFIED,
 		.block_size = SIZE_UNSPECIFIED,
 		.byte_order = BYTE_ORDER_CPU,
+		.output_format = isatty(1) ? "text:color=1" : "text",
 	};
 
-	while ((opt = getopt(argc, argv, "B:C:d:Ehi:LMm:o:PrStTvw")) != -1) {
+	while ((opt = getopt(argc, argv, "B:C:d:Ehi:lLMm:o:PrStTvw")) != -1) {
 		switch (opt) {
 		case 'B':
 			if (opts->block_size != SIZE_UNSPECIFIED) {
@@ -134,6 +135,13 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 			}
 			opts->src_path = optarg;
 			break;
+		case 'l':
+			if (opts->mode != PROGRAM_MODE_UNSPECIFIED) {
+				log("-l/-r/-w can only be used once");
+				return -1;
+			}
+			opts->mode = PROGRAM_MODE_LIST;
+			break;
 		case 'L':
 			if (opts->byte_order != BYTE_ORDER_CPU) {
 				log("-L/-M can only be used once");
@@ -173,7 +181,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 			break;
 		case 'r':
 			if (opts->mode != PROGRAM_MODE_UNSPECIFIED) {
-				log("-r/-w can only be used once");
+				log("-l/-r/-w can only be used once");
 				return -1;
 			}
 			opts->mode = PROGRAM_MODE_READ;
@@ -208,7 +216,7 @@ int options_parse_cli(int argc, char *argv[], struct opts *opts) {
 			break;
 		case 'w':
 			if (opts->mode != PROGRAM_MODE_UNSPECIFIED) {
-				log("-r/-w can only be used once");
+				log("-l/-r/-w can only be used once");
 				return -1;
 			}
 			opts->mode = PROGRAM_MODE_WRITE;
@@ -230,10 +238,16 @@ int options_validate(const struct opts *opts) {
 	case PROGRAM_MODE_UNSPECIFIED:
 		log("mode of operation not specified, use either -r or -w");
 		return -1;
+	case PROGRAM_MODE_LIST:
+		if (!opts->device_path) {
+			log("Yaffs device path not specified, use -d");
+			return -1;
+		}
+		break;
 	case PROGRAM_MODE_READ:
 	case PROGRAM_MODE_WRITE:
 		if (!opts->device_path) {
-			log("MTD device path not specified, use -d");
+			log("Yaffs device path not specified, use -d");
 			return -1;
 		}
 		if (!opts->src_path) {

@@ -50,7 +50,7 @@ static int storage_open(struct storage *storage) {
 	int flags;
 	int ret;
 
-	flags = (storage->opts->mode == PROGRAM_MODE_READ ? O_RDONLY : O_RDWR);
+	flags = (storage->opts->mode == PROGRAM_MODE_WRITE ? O_RDWR : O_RDONLY);
 	storage->fd = open(storage->path, flags);
 	if (storage->fd < 0) {
 		ret = util_get_errno();
