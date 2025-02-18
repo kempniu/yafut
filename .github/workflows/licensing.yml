@@ -7,7 +7,7 @@ on: pull_request
 
 jobs:
   reuse:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Licensing
     steps:
       - name: Check out repository

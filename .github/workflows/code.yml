@@ -18,12 +18,12 @@ jobs:
   build:
     strategy:
       matrix:
-        image: ['alpine:3.19', 'debian:12', 'fedora:40', 'redhat/ubi9:latest', 'ubuntu:24.04']
+        image: ['alpine:3.21', 'debian:12', 'fedora:42', 'redhat/ubi9:latest', 'ubuntu:24.04']
         compiler: ['clang', 'gcc']
         include:
-          - image: 'macos-14'
+          - image: 'macos-15'
             compiler: 'clang'
-    runs-on: ${{ !startsWith(matrix.image, 'macos') && 'ubuntu-22.04' || matrix.image }}
+    runs-on: ${{ !startsWith(matrix.image, 'macos') && 'ubuntu-24.04' || matrix.image }}
     container: ${{ !startsWith(matrix.image, 'macos') && matrix.image || null }}
     name: Build (${{ matrix.image }}, ${{ matrix.compiler }})
     steps:
@@ -82,7 +82,7 @@ jobs:
           GCC_STATIC_ANALYZER: ${{ (startsWith(matrix.image, 'ubuntu') && matrix.compiler == 'gcc') && 'CFLAGS="-fanalyzer -D__gcc_analyzer__" ' || '' }}
         run: ${{ env.GCC_STATIC_ANALYZER }}${{ env.CLANG_STATIC_ANALYZER }}cmake ${{ env.CMAKE_ARGS_STANDARD }}${{ env.CMAKE_ARGS_EXTRA }} -B build && ${{ env.CLANG_STATIC_ANALYZER }}cmake --build build
   clang-format:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Code style
     steps:
       - name: Check out repository
