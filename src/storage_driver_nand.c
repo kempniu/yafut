@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <mtd/mtd-user.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
