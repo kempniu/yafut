@@ -9,9 +9,9 @@
 #define USAGE_MSG                                                              \
 	"Usage: %s "                                                           \
 	"-d { /dev/mtdX | /path/to/yaffs.img } "                               \
-	"{ -r | -w } "                                                         \
-	"-i <src> "                                                            \
-	"-o <dst> "                                                            \
+	"{ -l | -r | -w } "                                                    \
+	"[ -i <src> ] "                                                        \
+	"[ -o <dst> ] "                                                        \
 	"[ -m <mode> ] "                                                       \
 	"[ -t ] "                                                              \
 	"[ -C <bytes> ] "                                                      \
@@ -25,9 +25,10 @@
 	"[ -v ] "                                                              \
 	"[ -h ] "                                                              \
 	"\n\n"                                                                 \
-	"    -d  path to the MTD character device (or Yaffs image) to use\n"   \
-	"    -r  read a file from the MTD into a local file\n"                 \
-	"    -w  write a local file to a file on the MTD\n"                    \
+	"    -d  path to the MTD character device or Yaffs image to use\n"     \
+	"    -l  list Yaffs file system contents\n"                            \
+	"    -r  read a file from the Yaffs file system into a local file\n"   \
+	"    -w  write a local file to a file on the Yaffs file system\n"      \
 	"    -i  path to the source file (use '-' to read from stdin)\n"       \
 	"    -o  path to the destination file (use '-' to write to stdout)\n"  \
 	"    -m  set destination file access permissions to <mode> (octal)\n"  \
@@ -46,6 +47,7 @@
 
 enum program_mode {
 	PROGRAM_MODE_UNSPECIFIED,
+	PROGRAM_MODE_LIST,
 	PROGRAM_MODE_READ,
 	PROGRAM_MODE_WRITE,
 };
@@ -73,6 +75,7 @@ struct opts {
 	bool disable_checkpoints;
 	bool disable_summaries;
 	enum byte_order byte_order;
+	const char *output_format;
 };
 
 void options_parse_env(void);

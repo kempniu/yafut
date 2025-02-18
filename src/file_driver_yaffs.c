@@ -11,6 +11,7 @@
 #include "file_driver.h"
 #include "log.h"
 #include "storage.h"
+#include "util.h"
 
 static int file_yaffs_instantiate(const struct file_spec *spec,
 				  void **driver_datap) {
@@ -24,7 +25,7 @@ static int file_yaffs_instantiate(const struct file_spec *spec,
 
 	ret = yaffs_mount_reldev((struct yaffs_dev *)storage);
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "unable to mount Yaffs filesystem");
 		storage_destroy(&storage);
 		return ret;
@@ -43,7 +44,7 @@ static void file_yaffs_destroy(void **driver_datap) {
 
 	ret = yaffs_unmount_reldev((struct yaffs_dev *)storage);
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error unmounting Yaffs filesystem");
 	}
 
@@ -59,7 +60,7 @@ static int file_yaffs_open(struct file *file, int flags) {
 	log_debug("yaffs_open_reldev, path=%s, ret=%d", file->path, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		return ret;
 	}
 
@@ -103,7 +104,7 @@ static int file_yaffs_read(struct file *file, unsigned char *buf,
 	log_debug("yaffs_read, fd=%d, count=%d, ret=%d", file->fd, count, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error reading '%s'", file->path);
 	}
 
@@ -118,7 +119,7 @@ static int file_yaffs_write(struct file *file, const unsigned char *buf,
 	log_debug("yaffs_write, fd=%d, count=%d, ret=%d", file->fd, count, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error writing '%s'", file->path);
 	}
 
@@ -133,7 +134,7 @@ static int file_yaffs_get_mode(struct file *file, int *modep) {
 	log_debug("yaffs_fstat, fd=%d, ret=%d", file->fd, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error getting permissions for '%s'",
 			  file->path);
 		return ret;
@@ -153,7 +154,7 @@ static int file_yaffs_set_mode(struct file *file, int mode) {
 		  ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error setting permissions for '%s'",
 			  file->path);
 	}
@@ -169,7 +170,7 @@ static int file_yaffs_get_mtime(struct file *file, unsigned long long *mtimep) {
 	log_debug("yaffs_fstat, fd=%d, ret=%d", file->fd, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error getting modification time for '%s'",
 			  file->path);
 		return ret;
@@ -189,7 +190,7 @@ int file_yaffs_set_mtime(struct file *file, unsigned long long mtime) {
 	log_debug("yaffs_futime, fd=%d, ret=%d", file->fd, ret);
 
 	if (ret < 0) {
-		ret = yaffsfs_GetLastError();
+		ret = util_get_yaffs_errno();
 		log_error(ret, "error setting modification time for '%s'",
 			  file->path);
 	}
