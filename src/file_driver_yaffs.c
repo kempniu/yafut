@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <stddef.h>
 
 #include <yaffsfs.h>
 

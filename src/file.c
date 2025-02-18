@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <errno.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "file.h"

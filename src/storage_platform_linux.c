@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <errno.h>
+#include <fcntl.h>
 #include <mtd/mtd-user.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>

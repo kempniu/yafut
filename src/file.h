@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <unistd.h>
+#include <stddef.h>
 
 enum file_type {
 	FILE_TYPE_POSIX,
